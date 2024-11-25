@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { Toaster } from '@/ui_template/ui/toaster';
 
 const ThemeContext = createContext();
 
@@ -25,6 +26,7 @@ export function ThemeProvider({ children }) {
     return (
         <ThemeContext.Provider value={{ theme, setTheme }}>
             {children}
+            <Toaster />
         </ThemeContext.Provider>
     );
 }

@@ -12,9 +12,19 @@
   --text: theme('colors.cyan.50');
 }
 
-[class='ocean'] {
-  --background: theme('colors.blue.900');
-  --text: theme('colors.blue.50');
+.toast-success {
+  background-color: hsl(var(--toast-success));
+  color: white;
+}
+
+.toast-warning {
+  background-color: hsl(var(--toast-warning));
+  color: black;
+}
+
+.toast-destructive {
+  background-color: hsl(var(--toast-destructive));
+  color: white;
 }
 
 body {

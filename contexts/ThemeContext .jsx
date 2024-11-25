@@ -4,8 +4,7 @@ const ThemeContext = createContext();
 
 export const themes = {
     light: 'light',
-    dark: 'dark',
-    ocean: 'ocean'
+    dark: 'dark'
 };
 
 export function ThemeProvider({ children }) {

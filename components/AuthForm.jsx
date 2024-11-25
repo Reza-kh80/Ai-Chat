@@ -62,20 +62,8 @@ const AuthForm = () => {
 
         if (user) {
             localStorage.setItem('active', user.email);
-            push('/home');
-            toast({
-                variant: "destructive",
-                title: "Uh oh! Something went wrong.",
-                description: "There was a problem with your request.",
-                action: <ToastAction altText="Try again">Try again</ToastAction>,
-            });
+            push('/ai-chat');
         } else {
-            toast({
-                title: "Error",
-                description: "Invalid credentials",
-                variant: "destructive",
-                className: "bg-red-50 border-red-200 text-red-800",
-            });
         }
     };
 

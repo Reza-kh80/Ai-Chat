@@ -2,12 +2,12 @@ import React from 'react';
 
 // import Components
 import Layout from '@/components/Layout';
-import ChatArea from '@/components/ChatArea';
+import CheckActive from '@/components/CheckActive';
 
 const AiChat = () => {
     return (
         <Layout title="Chat">
-            <ChatArea />
+            <CheckActive />
         </Layout>
     )
 }

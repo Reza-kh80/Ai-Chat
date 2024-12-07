@@ -1,19 +1,17 @@
-import { ToastAction } from '@/ui_template/ui/toast';
 import { Dumbbell, Mail, Lock } from 'lucide-react';
 import { Button } from '@/ui_template/ui/button';
 import { Input } from '@/ui_template/ui/input';
 import { Label } from '@/ui_template/ui/label';
 import { Card } from '@/ui_template/ui/card';
-import { useToast } from '@/hooks/use-toast';
 import React, { useState } from 'react';
 import { useRouter } from 'next/router';
+import { showToast } from '@/ui_template/ui/toast';
 
 const AuthForm = () => {
     const { push } = useRouter();
     const [isFlipped, setIsFlipped] = useState(false);
     const [loginData, setLoginData] = useState({ email: '', password: '' });
     const [signupData, setSignupData] = useState({ email: '', password: '', confirmPassword: '' });
-    const { toast } = useToast();
 
     // Add validation states
     const [errors, setErrors] = useState({
@@ -64,6 +62,7 @@ const AuthForm = () => {
             localStorage.setItem('active', user.email);
             push('/ai-chat');
         } else {
+            showToast({ message: "User not found! Please at first register.", type: "error" })
         }
     };
 
@@ -112,12 +111,8 @@ const AuthForm = () => {
             password: signupData.password,
         });
         localStorage.setItem('users', JSON.stringify(users));
-
-        toast({
-            title: "Success!",
-            description: "Account created successfully!",
-            className: "bg-green-50 border-green-200 text-green-800",
-        });
+        showToast({ message: "Account created successfully!.", type: "success" });
+        setIsFlipped(true);
         setIsFlipped(false);
     };
 

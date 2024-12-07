@@ -2,9 +2,11 @@ import React from 'react';
 import { Moon, Sun, LogOut } from 'lucide-react';
 import { Button } from '@/ui_template/ui/button';
 import { useTheme, themes } from '@/contexts/ThemeContext ';
+import { useRouter } from 'next/router';
 
 const Settings = ({ user }) => {
     const { theme, setTheme } = useTheme();
+    const { push } = useRouter();
 
     const themeIcons = {
         [themes.light]: <Sun className="h-5 w-5 transition-transform duration-300 group-hover:rotate-90" />,
@@ -77,6 +79,10 @@ const Settings = ({ user }) => {
                             hover:bg-red-100 hover:text-red-600
                             dark:hover:bg-red-900/50 dark:hover:text-red-400
                             ocean:hover:bg-red-900/50 ocean:hover:text-red-400"
+                            onClick={() => {
+                                localStorage.setItem("active", 'deactive');
+                                push('/')
+                            }}
                         >
                             <LogOut className="h-4 w-4" />
                         </Button>

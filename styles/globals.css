@@ -11,22 +11,6 @@
   --background: theme('colors.gray.900');
   --text: theme('colors.cyan.50');
 }
-
-.toast-success {
-  background-color: hsl(var(--toast-success));
-  color: white;
-}
-
-.toast-warning {
-  background-color: hsl(var(--toast-warning));
-  color: black;
-}
-
-.toast-destructive {
-  background-color: hsl(var(--toast-destructive));
-  color: white;
-}
-
 body {
   background-color: var(--background);
   color: var(--text);
@@ -58,4 +42,10 @@ body {
 
 .position-important {
   position: static !important;
+}
+
+.bg-grid-slate-100 {
+  background-image: linear-gradient(to right, rgba(55, 65, 81, 0.1) 1px, transparent 1px),
+  linear-gradient(to bottom, rgba(55, 65, 81, 0.1) 1px, transparent 1px);
+  background-size: 20px 20px;
 }

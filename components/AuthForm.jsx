@@ -6,6 +6,7 @@ import { Card } from '@/ui_template/ui/card';
 import React, { useState } from 'react';
 import { useRouter } from 'next/router';
 import { showToast } from '@/ui_template/ui/toast';
+import axiosInstance from '@/lib/axiosInstance';
 
 const AuthForm = () => {
     const { push } = useRouter();
@@ -24,7 +25,7 @@ const AuthForm = () => {
         return emailRegex.test(email);
     };
 
-    const handleLogin = (e) => {
+    const handleLogin = async (e) => {
         e.preventDefault();
 
         // Reset errors
@@ -55,18 +56,16 @@ const AuthForm = () => {
             return;
         }
 
-        const users = JSON.parse(localStorage.getItem('users') || '[]');
-        const user = users.find(u => u.email === loginData.email && u.password === loginData.password);
-
-        if (user) {
-            localStorage.setItem('active', user.email);
+        try {
+            const response = await axiosInstance.post('/auth/login', loginData);
+            localStorage.setItem('token', response.data.token);
             push('/ai-chat');
-        } else {
-            showToast({ message: "User not found! Please at first register.", type: "error" })
+        } catch (error) {
+            showToast({ message: error.response?.data?.message || "Login failed", type: "error" });
         }
     };
 
-    const handleSignup = (e) => {
+    const handleSignup = async (e) => {
         e.preventDefault();
 
         // Reset errors
@@ -105,15 +104,13 @@ const AuthForm = () => {
             return;
         }
 
-        const users = JSON.parse(localStorage.getItem('users') || '[]');
-        users.push({
-            email: signupData.email,
-            password: signupData.password,
-        });
-        localStorage.setItem('users', JSON.stringify(users));
-        showToast({ message: "Account created successfully!.", type: "success" });
-        setIsFlipped(true);
-        setIsFlipped(false);
+        try {
+            const response = await axiosInstance.post('/auth/register', signupData);
+            showToast({ message: "Account created successfully!", type: "success" });
+            setIsFlipped(false);
+        } catch (error) {
+            showToast({ message: error.response?.data?.message || "Registration failed", type: "error" });
+        }
     };
 
     return (

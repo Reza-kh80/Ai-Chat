@@ -8,18 +8,18 @@ export default function Home() {
   const [activeUser, setActiveUser] = useState(null);
   const router = useRouter();
 
-  useEffect(() => {
-    const activeUser = localStorage.getItem('active');
-    if (activeUser === "deactive") {
-      setActiveUser(activeUser);
-    } else {
-      router.push('/ai-chat');
-    }
-  }, [router]);
+  // useEffect(() => {
+  //   const activeUser = localStorage.getItem('active');
+  //   if (activeUser === "deactive") {
+  //     setActiveUser(activeUser);
+  //   } else {
+  //     router.push('/ai-chat');
+  //   }
+  // }, [router]);
 
   return (
     <Layout title="Home">
-      {activeUser && <AuthForm />}
+      <AuthForm />
     </Layout>
   );
 }

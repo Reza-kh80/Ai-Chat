@@ -322,7 +322,7 @@ const ChatArea = ({ ac }) => {
                     <div className="p-6 border-b border-gray-100 dark:border-gray-800">
                         <div className="flex items-center justify-between mb-6">
                             <h1 className="text-2xl font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                                Insights AI
+                                Chatter AI
                             </h1>
                             <Button onClick={() => setSidebarOpen(false)} className="lg:hidden px-0">
                                 <X className="h-5 w-5 text-gray-500" />

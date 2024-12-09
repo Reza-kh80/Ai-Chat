@@ -59,6 +59,7 @@ const AuthForm = () => {
         try {
             const response = await axiosInstance.post('/auth/login', loginData);
             localStorage.setItem('token', response.data.token);
+            localStorage.setItem('user', JSON.stringify({ email: response.data.email, active: true }));
             push('/ai-chat');
         } catch (error) {
             showToast({ message: error.response?.data?.message || "Login failed", type: "error" });

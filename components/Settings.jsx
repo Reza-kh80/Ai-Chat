@@ -4,7 +4,7 @@ import { Button } from '@/ui_template/ui/button';
 import { useTheme, themes } from '@/contexts/ThemeContext ';
 import { useRouter } from 'next/router';
 
-const Settings = ({ user }) => {
+const Settings = ({ email, active }) => {
     const { theme, setTheme } = useTheme();
     const { push } = useRouter();
 
@@ -50,7 +50,7 @@ const Settings = ({ user }) => {
                     </div>
                 </Button>
 
-                {user && (
+                {active && (
                     <div className="flex items-center justify-between p-4 
                     bg-primary-50/50 dark:bg-primary-900/50 ocean:bg-accent-900/50 
                     rounded-xl shadow-sm transition-all duration-300 hover:shadow-md">
@@ -60,11 +60,11 @@ const Settings = ({ user }) => {
                             ocean:from-accent-600 ocean:to-accent-800
                             text-white font-medium
                             flex items-center justify-center shadow-inner">
-                                {user?.[0]?.toUpperCase()}
+                                {email?.[0]?.toUpperCase()}
                             </div>
                             <div className="flex flex-col">
                                 <span className="font-medium text-primary-900 dark:text-primary-50 ocean:text-accent-50">
-                                    {user}
+                                    {email}
                                 </span>
                                 <span className="text-xs text-primary-600 dark:text-primary-400 ocean:text-accent-400">
                                     Active Now
@@ -80,7 +80,8 @@ const Settings = ({ user }) => {
                             dark:hover:bg-red-900/50 dark:hover:text-red-400
                             ocean:hover:bg-red-900/50 ocean:hover:text-red-400"
                             onClick={() => {
-                                localStorage.setItem("active", 'deactive');
+                                localStorage.setItem('user', JSON.stringify({ email: '', active: false }));
+                                localStorage.removeItem('token');   
                                 push('/')
                             }}
                         >

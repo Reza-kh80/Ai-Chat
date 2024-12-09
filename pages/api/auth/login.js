@@ -31,7 +31,7 @@ export default async function handler(req, res) {
             { expiresIn: '7d' }
         );
 
-        res.status(200).json({ token });
+        res.status(200).json({ token, email });
     } catch (error) {
         res.status(500).json({ message: 'Internal server error' });
     }

@@ -15,6 +15,7 @@ import {
 } from "@/ui_template/ui/dialog";
 import MessageBubble from '@/components/MessageBubble';
 import { showToast } from '@/ui_template/ui/toast';
+import axiosInstance from '@/lib/axiosInstance';
 const ChatArea = ({ ac }) => {
 
     const [processingMessageId, setProcessingMessageId] = useState(null);
@@ -46,10 +47,18 @@ const ChatArea = ({ ac }) => {
     }, [currentChat, scrollToBottom]);
 
     useEffect(() => {
-        const chatHistory = localStorage.getItem('chats');
-        if (chatHistory) {
-            setChats(JSON.parse(chatHistory));
-        }
+        const loadChats = async () => {
+            try {
+                const response = await axiosInstance.get('/chat');
+                if (response.data) {
+                    setChats(response.data);
+                }
+            } catch (error) {
+                console.error('Error loading chats:', error);
+                showToast({ type: 'error', message: 'Failed to load chats' });
+            }
+        };
+        loadChats();
     }, []);
 
     const convertImageToBase64 = useCallback((file) => {
@@ -61,7 +70,7 @@ const ChatArea = ({ ac }) => {
         });
     }, []);
 
-    const processMessageWithLLM = useCallback(async (messages, imageBase64 = null) => {
+    const processMessageWithLLM = useCallback(async (messages, imageBase64 = null, chatTitle = '') => {
         try {
             setIsLoading(true);
             const formattedMessages = messages.map(msg => ({
@@ -71,20 +80,15 @@ const ChatArea = ({ ac }) => {
                     : msg.content
             }));
 
-            const response = await fetch(process.env.NEXT_PUBLIC_AI_API_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${process.env.NEXT_PUBLIC_AI_API_KEY}`
-                },
-                body: JSON.stringify({
-                    model: process.env.NEXT_PUBLIC_AI_MODEL,
-                    messages: formattedMessages,
-                    stream: true
-                })
+            const response = await axiosInstance.post('/chat', {
+                title: chatTitle, // Added chatTitle here
+                messages: formattedMessages,
+                category: ''
+            }, {
+                responseType: 'stream'
             });
 
-            const reader = response.body.getReader();
+            const reader = response.data.getReader();
             const decoder = new TextDecoder();
             let assistantMessage = { role: 'assistant', content: '', id: Date.now() };
             let buffer = '';
@@ -101,7 +105,7 @@ const ChatArea = ({ ac }) => {
                     if (line.startsWith('data: ')) {
                         try {
                             const data = JSON.parse(line.slice(6));
-                            if (data.choices[0]?.delta?.content) {
+                            if (data.choices?.[0]?.delta?.content) {
                                 buffer += data.choices[0].delta.content;
                                 assistantMessage.content = buffer;
                                 setStreamingMessage(buffer);
@@ -113,6 +117,7 @@ const ChatArea = ({ ac }) => {
                 }
             }
 
+            assistantMessage.timestamp = new Date().toISOString();
             return assistantMessage;
         } catch (error) {
             console.error('Error processing message:', error);
@@ -129,40 +134,50 @@ const ChatArea = ({ ac }) => {
     }, []);
 
     const createNewChat = useCallback(() => {
+        // Create a new chat space without sending an API request
         const newChat = {
-            id: Date.now(),
+            id: Date.now(), // Temporary ID
+            title: '',
+            category: 'General',
             messages: [],
-            title: 'New Chat',
-            lastUpdate: Date.now(),
-            category: 'General'
+            lastUpdate: new Date().toISOString(),
         };
-        setCurrentChat(newChat);
-        setChats(prev => [newChat, ...prev]);
+
+        setCurrentChat(newChat); // Set the new chat as the current chat
+        setChats((prev) => [newChat, ...prev]); // Add the new chat to the chat list
         setSidebarOpen(false);
     }, []);
 
     const handleImageUpload = useCallback(async (e) => {
         const file = e.target.files[0];
         if (file) {
-
             if (file.size > 5 * 1024 * 1024) {
                 showToast({ type: 'error', message: 'File size should be less than 5MB' });
                 return;
             }
 
             try {
-                const base64Image = await convertImageToBase64(file);
+                const formData = new FormData();
+                formData.append('image', file);
+
+                const response = await axiosInstance.post('/upload', formData, {
+                    headers: {
+                        'Content-Type': 'multipart/form-data',
+                    },
+                });
+
+                const base64Image = response.data.imageUrl;
                 setSelectedImage(base64Image);
                 if (prompt.trim()) {
                     handleSubmit(null, base64Image);
                 }
-                showToast({ type: 'Success', message: 'Image uploaded successfully' });
+                showToast({ type: 'success', message: 'Image uploaded successfully' });
             } catch (error) {
                 console.error('Error processing image:', error);
                 showToast({ type: 'error', message: 'Failed to process image' });
             }
         }
-    }, [convertImageToBase64, prompt]);
+    }, [prompt]);
 
     const handleSubmit = useCallback(async (e, imageBase64 = null) => {
         if (e) e.preventDefault();
@@ -171,8 +186,9 @@ const ChatArea = ({ ac }) => {
             return;
         }
 
+        setIsLoading(true);
+
         const userMessage = {
-            id: Date.now(),
             role: 'user',
             content: prompt || '',
             image: imageBase64 || selectedImage,
@@ -180,39 +196,87 @@ const ChatArea = ({ ac }) => {
         };
 
         try {
-            const updatedMessages = [...(currentChat?.messages || []), userMessage];
-            const assistantMessage = await processMessageWithLLM(updatedMessages, userMessage.image);
-            const finalMessages = [...updatedMessages, assistantMessage];
+            // Show user message immediately
+            setCurrentChat(prev => ({
+                ...prev,
+                messages: [...(prev?.messages || []), userMessage]
+            }));
 
-            if (!currentChat) {
-                const chatTitle = prompt.trim()
-                    ? prompt.length > 25 ? prompt.slice(0, 25) + '...' : prompt
-                    : 'New Chat';
+            // Create response object
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({
+                    chatId: currentChat?.id, // Send chatId if it exists
+                    message: userMessage
+                })
+            });
 
-                const newChat = {
-                    id: Date.now(),
-                    messages: finalMessages,
-                    title: chatTitle,
-                    lastUpdate: Date.now(),
-                    category: 'General'
-                };
-                setCurrentChat(newChat);
-                saveChatsToLocalStorage([newChat, ...chats]);
-            } else {
-                const updatedChat = {
-                    ...currentChat,
-                    messages: finalMessages,
-                    title: currentChat.title === 'New Chat' && prompt.trim()
-                        ? prompt.length > 25 ? prompt.slice(0, 25) + '...' : prompt
-                        : currentChat.title,
-                    lastUpdate: Date.now()
-                };
-                setCurrentChat(updatedChat);
-                const updatedChats = chats.map(chat =>
-                    chat.id === currentChat.id ? updatedChat : chat
-                );
-                saveChatsToLocalStorage(updatedChats);
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let assistantMessage = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n').filter(line => line.trim() !== '');
+
+                for (const line of lines) {
+                    if (line.includes('[DONE]')) continue;
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.slice(6));
+
+                            switch (data.type) {
+                                case 'init':
+                                    // Update chat data with initial state
+                                    setCurrentChat(data.chat);
+                                    setChats(prev => {
+                                        const filtered = prev.filter(c => c.id !== data.chat.id);
+                                        return [data.chat, ...filtered];
+                                    });
+                                    break;
+
+                                case 'stream':
+                                    // Update streaming message
+                                    assistantMessage += data.content;
+                                    setStreamingMessage(assistantMessage);
+                                    break;
+
+                                case 'complete':
+                                    // Update final message
+                                    setStreamingMessage('');
+                                    setCurrentChat(prev => ({
+                                        ...prev,
+                                        messages: [...prev.messages, data.message]
+                                    }));
+                                    setChats(prev =>
+                                        prev.map(chat =>
+                                            chat.id === data.chatId
+                                                ? {
+                                                    ...chat,
+                                                    messages: [...chat.messages, data.message]
+                                                }
+                                                : chat
+                                        )
+                                    );
+                                    break;
+
+                                case 'error':
+                                    throw new Error(data.error);
+                            }
+                        } catch (error) {
+                            console.error('Error parsing stream:', error);
+                        }
+                    }
+                }
             }
+
         } catch (error) {
             console.error('Error:', error);
             showToast({ type: 'error', message: 'Failed to send message. Please try again.' });
@@ -220,12 +284,11 @@ const ChatArea = ({ ac }) => {
             setIsLoading(false);
             setPrompt('');
             setSelectedImage(null);
-            setStreamingMessage('');
             if (fileInputRef.current) {
                 fileInputRef.current.value = '';
             }
         }
-    }, [prompt, isLoading, currentChat, chats, selectedImage, processMessageWithLLM, saveChatsToLocalStorage]);
+    }, [prompt, isLoading, currentChat, selectedImage]);
 
     const loadChat = useCallback((chat) => {
         setCurrentChat(chat);
@@ -253,18 +316,27 @@ const ChatArea = ({ ac }) => {
         return "just now";
     }, []);
 
-    const deleteChat = useCallback((chatId) => {
+    const deleteChat = useCallback(async (chatId) => {
         try {
+            // API call to delete the chat by chatId
+            await axiosInstance.delete(`/chat?chatId=${chatId}`);
+
+            // Update local state after successful deletion
             const updatedChats = chats.filter(chat => chat.id !== chatId);
-            saveChatsToLocalStorage(updatedChats);
+            setChats(updatedChats);
+
+            // Clear current chat if it was the deleted one
             if (currentChat?.id === chatId) {
                 setCurrentChat(null);
+                setPrompt('');
             }
+
             showToast({ type: 'success', message: 'Chat deleted successfully' });
         } catch (error) {
+            console.error('Error deleting chat:', error);
             showToast({ type: 'error', message: 'Failed to delete chat' });
         }
-    }, [chats, currentChat, saveChatsToLocalStorage]);
+    }, [chats, currentChat]);
 
     const handleMessageEdit = useCallback(async (messageId, newContent) => {
         if (!currentChat) {
@@ -274,33 +346,22 @@ const ChatArea = ({ ac }) => {
         setProcessingMessageId(messageId);
 
         try {
-            const messageIndex = currentChat.messages.findIndex(msg => msg.id === messageId);
-            if (messageIndex === -1) return;
+            // API call to update the message
+            const response = await axiosInstance.put('/chat', { messageId, newContent });
+            const updatedMessage = response.data.updatedMessage;
 
-            let updatedMessages = [...currentChat.messages];
-            updatedMessages[messageIndex] = {
-                ...updatedMessages[messageIndex],
-                content: newContent
-            };
+            // Update the local state with the edited message
+            const updatedMessages = currentChat.messages.map(msg =>
+                msg.id === messageId ? { ...msg, content: updatedMessage.content } : msg
+            );
 
-            if (messageIndex + 1 < updatedMessages.length &&
-                updatedMessages[messageIndex + 1].role === 'assistant') {
-                const messagesUpToEdit = updatedMessages.slice(0, messageIndex + 1);
-                const newResponse = await processMessageWithLLM(messagesUpToEdit);
-                updatedMessages[messageIndex + 1] = newResponse;
-            }
-
-            const updatedChat = {
-                ...currentChat,
-                messages: updatedMessages,
-                lastUpdate: Date.now()
-            };
-
+            const updatedChat = { ...currentChat, messages: updatedMessages };
             setCurrentChat(updatedChat);
             const updatedChats = chats.map(chat =>
                 chat.id === currentChat.id ? updatedChat : chat
             );
             saveChatsToLocalStorage(updatedChats);
+
             showToast({ type: 'success', message: 'Message updated successfully' });
         } catch (error) {
             console.error('Error updating message:', error);
@@ -308,7 +369,7 @@ const ChatArea = ({ ac }) => {
         } finally {
             setProcessingMessageId(null);
         }
-    }, [currentChat, chats, processMessageWithLLM, saveChatsToLocalStorage]);
+    }, [currentChat, chats, saveChatsToLocalStorage]);
 
     return (
         <div className={`h-screen w-full bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-gray-900 dark:to-indigo-950 transition-all duration-300 ${isExpanded ? 'p-0' : 'p-4'}`}>
@@ -353,7 +414,7 @@ const ChatArea = ({ ac }) => {
                                             onClick={() => loadChat(thread)}
                                             className="font-medium text-gray-900 dark:text-gray-100 cursor-pointer flex-1"
                                         >
-                                            {thread.title}
+                                            {thread.title || 'Untitled Chat'} {/* Fallback title */}
                                         </h3>
                                     </div>
                                     <div className="flex items-center gap-4 text-sm text-gray-500">

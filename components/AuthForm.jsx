@@ -57,9 +57,11 @@ const AuthForm = () => {
         }
 
         try {
-            const response = await axiosInstance.post('/auth/login', loginData);
+            const response = await axiosInstance.post('/users/login', loginData);
+
             localStorage.setItem('token', response.data.token);
             localStorage.setItem('user', JSON.stringify({ email: response.data.email, active: true }));
+            showToast({ message: response?.data?.message, type: "success" });
             push('/ai-chat');
         } catch (error) {
             showToast({ message: error.response?.data?.message || "Login failed", type: "error" });
@@ -106,7 +108,7 @@ const AuthForm = () => {
         }
 
         try {
-            const response = await axiosInstance.post('/auth/register', signupData);
+            const response = await axiosInstance.post('/users/signup', signupData);
             showToast({ message: "Account created successfully!", type: "success" });
             setIsFlipped(false);
         } catch (error) {

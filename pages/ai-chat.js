@@ -1,13 +1,13 @@
 import React from 'react';
 
 // import Components
+import ChatArea from '@/components/ChatArea';
 import Layout from '@/components/Layout';
-import CheckActive from '@/components/CheckActive';
 
 const AiChat = () => {
     return (
         <Layout title="Chat">
-            <CheckActive />
+            <ChatArea />
         </Layout>
     )
 }

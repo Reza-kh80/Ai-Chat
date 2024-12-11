@@ -16,7 +16,7 @@ import {
 import MessageBubble from '@/components/MessageBubble';
 import { showToast } from '@/ui_template/ui/toast';
 import axiosInstance from '@/lib/axiosInstance';
-const ChatArea = ({ ac }) => {
+const ChatArea = () => {
 
     const [processingMessageId, setProcessingMessageId] = useState(null);
     const [showImageUpload, setShowImageUpload] = useState(false);

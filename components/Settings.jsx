@@ -3,6 +3,8 @@ import { Moon, Sun, LogOut } from 'lucide-react';
 import { Button } from '@/ui_template/ui/button';
 import { useTheme, themes } from '@/contexts/ThemeContext ';
 import { useRouter } from 'next/router';
+import { showToast } from '@/ui_template/ui/toast';
+import axiosInstance from '@/lib/axiosInstance';
 
 const Settings = ({ email, active }) => {
     const { theme, setTheme } = useTheme();
@@ -20,6 +22,26 @@ const Settings = ({ email, active }) => {
         setTheme(themeValues[nextIndex]);
     };
 
+    const handleLogOut = () => {
+        axiosInstance.post('/users/logout')
+            .then((res) => {
+                if (res.status === 200) {
+                    localStorage.setItem('user', JSON.stringify({ email: '', active: false }));
+                    localStorage.removeItem('token');
+                    showToast({ message: res?.data?.message, type: "success" });
+                    push('/');
+                } else if (res.status === 404) {
+                    showToast({ message: "User not found!", type: "error" });
+                }
+            })
+            .catch((err) => {
+                console.error("Logout error:", err);
+                showToast({
+                    message: err.response?.data?.message || "An error occurred. Please try again.",
+                    type: "error"
+                });
+            });
+    };
     return (
         <div className="px-6 py-5 mt-auto border-t border-primary-200/30 dark:border-primary-800/30 ocean:border-accent-800/30 backdrop-blur-sm">
             <div className="space-y-5">
@@ -79,11 +101,7 @@ const Settings = ({ email, active }) => {
                             hover:bg-red-100 hover:text-red-600
                             dark:hover:bg-red-900/50 dark:hover:text-red-400
                             ocean:hover:bg-red-900/50 ocean:hover:text-red-400"
-                            onClick={() => {
-                                localStorage.setItem('user', JSON.stringify({ email: '', active: false }));
-                                localStorage.removeItem('token');   
-                                push('/')
-                            }}
+                            onClick={handleLogOut}
                         >
                             <LogOut className="h-4 w-4" />
                         </Button>

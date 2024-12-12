@@ -46,21 +46,6 @@ const ChatArea = () => {
         }
     }, [currentChat, scrollToBottom]);
 
-    useEffect(() => {
-        const loadChats = async () => {
-            try {
-                const response = await axiosInstance.get('/chat');
-                if (response.data) {
-                    setChats(response.data);
-                }
-            } catch (error) {
-                console.error('Error loading chats:', error);
-                showToast({ type: 'error', message: 'Failed to load chats' });
-            }
-        };
-        loadChats();
-    }, []);
-
     const convertImageToBase64 = useCallback((file) => {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -133,21 +118,6 @@ const ChatArea = () => {
         setChats(updatedChats);
     }, []);
 
-    const createNewChat = useCallback(() => {
-        // Create a new chat space without sending an API request
-        const newChat = {
-            id: Date.now(), // Temporary ID
-            title: '',
-            category: 'General',
-            messages: [],
-            lastUpdate: new Date().toISOString(),
-        };
-
-        setCurrentChat(newChat); // Set the new chat as the current chat
-        setChats((prev) => [newChat, ...prev]); // Add the new chat to the chat list
-        setSidebarOpen(false);
-    }, []);
-
     const handleImageUpload = useCallback(async (e) => {
         const file = e.target.files[0];
         if (file) {
@@ -189,10 +159,10 @@ const ChatArea = () => {
         setIsLoading(true);
 
         const userMessage = {
-            role: 'user',
+            id: currentChat.messages[currentChat.messages.length - 1]?.id + 1, // Add unique ID
             content: prompt || '',
+            role: 'user',
             image: imageBase64 || selectedImage,
-            timestamp: new Date().toISOString()
         };
 
         try {
@@ -202,77 +172,70 @@ const ChatArea = () => {
                 messages: [...(prev?.messages || []), userMessage]
             }));
 
-            // Create response object
-            const response = await fetch('/api/chat', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                },
-                body: JSON.stringify({
-                    chatId: currentChat?.id, // Send chatId if it exists
-                    message: userMessage
-                })
+            const response = await axiosInstance.post('/messages', {
+                chatId: currentChat?.id,
+                content: prompt || '',
+                image: imageBase64 || selectedImage
+            }, {
+                responseType: 'text',
             });
 
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
+            const lines = response.data.split('\n').filter(line => line.trim() !== '');
             let assistantMessage = '';
 
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
+            for (const line of lines) {
+                if (line.includes('[DONE]')) continue;
+                if (line.startsWith('data: ')) {
+                    try {
+                        const data = JSON.parse(line.slice(6));
 
-                const chunk = decoder.decode(value);
-                const lines = chunk.split('\n').filter(line => line.trim() !== '');
+                        switch (data.type) {
+                            case 'init':
+                                // Don't update messages here, just other chat data
+                                const chatWithoutMessages = { ...data.chat };
+                                delete chatWithoutMessages.messages;
+                                setCurrentChat(prev => ({
+                                    ...prev,
+                                    ...chatWithoutMessages
+                                }));
+                                break;
 
-                for (const line of lines) {
-                    if (line.includes('[DONE]')) continue;
-                    if (line.startsWith('data: ')) {
-                        try {
-                            const data = JSON.parse(line.slice(6));
+                            case 'chunk':
+                                assistantMessage += data.content;
+                                setStreamingMessage(assistantMessage);
+                                // Add a small delay to make the streaming appear more natural
+                                await new Promise(resolve => setTimeout(resolve, 10));
+                                break;
 
-                            switch (data.type) {
-                                case 'init':
-                                    // Update chat data with initial state
-                                    setCurrentChat(data.chat);
-                                    setChats(prev => {
-                                        const filtered = prev.filter(c => c.id !== data.chat.id);
-                                        return [data.chat, ...filtered];
-                                    });
-                                    break;
+                            case 'done':
+                                setStreamingMessage('');
+                                const finalMessage = {
+                                    id: currentChat.messages[currentChat.messages.length - 1]?.id + 2,
+                                    content: data.content,
+                                    role: 'assistant',
+                                };
+                                setCurrentChat(prev => ({
+                                    ...prev,
+                                    messages: [...prev.messages, finalMessage]
+                                }));
+                                setChats(prev =>
+                                    prev.map(chat =>
+                                        chat.id === currentChat.id
+                                            ? {
+                                                ...chat,
+                                                messages: [...chat.messages, finalMessage]
+                                            }
+                                            : chat
+                                    )
+                                );
+                                break;
 
-                                case 'stream':
-                                    // Update streaming message
-                                    assistantMessage += data.content;
-                                    setStreamingMessage(assistantMessage);
-                                    break;
-
-                                case 'complete':
-                                    // Update final message
-                                    setStreamingMessage('');
-                                    setCurrentChat(prev => ({
-                                        ...prev,
-                                        messages: [...prev.messages, data.message]
-                                    }));
-                                    setChats(prev =>
-                                        prev.map(chat =>
-                                            chat.id === data.chatId
-                                                ? {
-                                                    ...chat,
-                                                    messages: [...chat.messages, data.message]
-                                                }
-                                                : chat
-                                        )
-                                    );
-                                    break;
-
-                                case 'error':
-                                    throw new Error(data.error);
-                            }
-                        } catch (error) {
-                            console.error('Error parsing stream:', error);
+                            case 'error':
+                                throw new Error(data.error);
                         }
+                    } catch (error) {
+                        console.error('Error parsing stream:', error);
+                        showToast({ type: 'error', message: 'Error parsing response' });
                     }
                 }
             }
@@ -288,7 +251,35 @@ const ChatArea = () => {
                 fileInputRef.current.value = '';
             }
         }
-    }, [prompt, isLoading, currentChat, selectedImage]);
+    }, [prompt, isLoading, currentChat, selectedImage, showToast]);
+
+    useEffect(() => {
+        const loadChats = async () => {
+            try {
+                const response = await axiosInstance.get('/chats');
+                if (response.data) {
+                    setChats(response.data.chats);
+                }
+            } catch (error) {
+                console.error('Error loading chats:', error);
+            }
+        };
+        loadChats();
+    }, []);
+
+    const createNewChat = useCallback(async () => {
+        try {
+            const response = await axiosInstance.post('/chats', { title: '', category: 'General' });
+            const newChat = response.data.chat;
+            setCurrentChat(newChat);
+            setChats((prev) => [newChat, ...prev]);
+            setSidebarOpen(false);
+            loadChat(newChat);
+        } catch (error) {
+            console.error('Error creating chat:', error);
+            showToast({ type: 'error', message: 'Failed to create new chat' });
+        }
+    }, []);
 
     const loadChat = useCallback((chat) => {
         setCurrentChat(chat);
@@ -296,7 +287,9 @@ const ChatArea = () => {
         setTimeout(scrollToBottom, 100);
     }, [scrollToBottom]);
 
-    const timeSince = useMemo(() => (date) => {
+    const timeSince = useMemo(() => (dateString) => {
+        const date = new Date(dateString.replace(' ', 'T'));
+
         const seconds = Math.floor((new Date() - date) / 1000);
         const intervals = [
             { seconds: 31536000, label: "years" },
@@ -309,67 +302,137 @@ const ChatArea = () => {
 
         for (let interval of intervals) {
             const count = Math.floor(seconds / interval.seconds);
-            if (count > 1) {
-                return `${count} ${interval.label}`;
+            if (count >= 1) {
+                return count === 1
+                    ? `${count} ${interval.label.slice(0, -1)}`
+                    : `${count} ${interval.label}`;
             }
         }
         return "just now";
     }, []);
 
-    const deleteChat = useCallback(async (chatId) => {
+    const deleteChat = async (chatId) => {
         try {
-            // API call to delete the chat by chatId
-            await axiosInstance.delete(`/chat?chatId=${chatId}`);
-
-            // Update local state after successful deletion
-            const updatedChats = chats.filter(chat => chat.id !== chatId);
-            setChats(updatedChats);
-
-            // Clear current chat if it was the deleted one
+            const response = await axiosInstance.delete(`/chats/${chatId}`);
+            setChats((prev) => prev.filter((chat) => chat.id !== chatId));
             if (currentChat?.id === chatId) {
                 setCurrentChat(null);
-                setPrompt('');
             }
-
-            showToast({ type: 'success', message: 'Chat deleted successfully' });
+            showToast({ type: 'success', message: response.data.message });
         } catch (error) {
             console.error('Error deleting chat:', error);
             showToast({ type: 'error', message: 'Failed to delete chat' });
         }
-    }, [chats, currentChat]);
+    };
 
     const handleMessageEdit = useCallback(async (messageId, newContent) => {
         if (!currentChat) {
             showToast({ type: 'error', message: 'No active chat found' });
             return;
         }
+
         setProcessingMessageId(messageId);
 
         try {
-            // API call to update the message
-            const response = await axiosInstance.put('/chat', { messageId, newContent });
-            const updatedMessage = response.data.updatedMessage;
+            // Find the index of the message being edited
+            const editedMessageIndex = currentChat.messages.findIndex(msg => msg.id === messageId);
 
-            // Update the local state with the edited message
-            const updatedMessages = currentChat.messages.map(msg =>
-                msg.id === messageId ? { ...msg, content: updatedMessage.content } : msg
-            );
+            // Update the local state with the edited message immediately
+            const updatedMessages = [...currentChat.messages];
+            updatedMessages[editedMessageIndex] = {
+                ...updatedMessages[editedMessageIndex],
+                content: newContent
+            };
 
             const updatedChat = { ...currentChat, messages: updatedMessages };
             setCurrentChat(updatedChat);
-            const updatedChats = chats.map(chat =>
-                chat.id === currentChat.id ? updatedChat : chat
-            );
-            saveChatsToLocalStorage(updatedChats);
 
-            showToast({ type: 'success', message: 'Message updated successfully' });
+            // API call to edit the message and get AI response
+            const response = await axiosInstance.put('/messages',
+                { messageId, newContent },
+                { responseType: 'text' }
+            );
+
+            const lines = response.data.split('\n').filter(line => line.trim() !== '');
+            let assistantMessage = '';
+
+            for (const line of lines) {
+                if (line.includes('[DONE]')) continue;
+                if (line.startsWith('data: ')) {
+                    try {
+                        const data = JSON.parse(line.slice(6));
+
+                        switch (data.type) {
+                            case 'chunk':
+                                assistantMessage += data.content;
+                                setStreamingMessage(assistantMessage);
+                                // Add a small delay to make the streaming appear more natural
+                                await new Promise(resolve => setTimeout(resolve, 10));
+                                break;
+
+                            case 'done':
+                                setStreamingMessage('');
+
+                                // Find the index of the next assistant message after the edited message
+                                const nextAssistantMessageIndex = currentChat.messages.findIndex(
+                                    (msg, index) =>
+                                        msg.role === 'assistant' &&
+                                        editedMessageIndex < index
+                                );
+
+                                // Create the updated messages array
+                                const finalMessages = nextAssistantMessageIndex !== -1
+                                    ? [
+                                        ...updatedMessages.slice(0, nextAssistantMessageIndex),
+                                        {
+                                            id: updatedMessages[nextAssistantMessageIndex].id,
+                                            content: data.content,
+                                            role: 'assistant',
+                                        },
+                                        ...updatedMessages.slice(nextAssistantMessageIndex + 1)
+                                    ]
+                                    : updatedMessages;
+
+                                // Update current chat state
+                                setCurrentChat(prev => ({
+                                    ...prev,
+                                    messages: finalMessages
+                                }));
+
+                                // Update chats list
+                                setChats(prev =>
+                                    prev.map(chat =>
+                                        chat.id === currentChat.id
+                                            ? {
+                                                ...chat,
+                                                messages: finalMessages
+                                            }
+                                            : chat
+                                    )
+                                );
+
+                                showToast({ type: 'success', message: 'Message updated successfully' });
+                                break;
+
+                            case 'error':
+                                throw new Error(data.error);
+                        }
+                    } catch (error) {
+                        console.error('Error parsing stream:', error);
+                        showToast({ type: 'error', message: 'Error processing response' });
+                    }
+                }
+            }
         } catch (error) {
             console.error('Error updating message:', error);
             showToast({ type: 'error', message: 'Failed to update message' });
+
+            // Revert local state if API call fails
+            setCurrentChat(currentChat);
         } finally {
             setProcessingMessageId(null);
         }
-    }, [currentChat, chats, saveChatsToLocalStorage]);
+    }, [currentChat, chats, saveChatsToLocalStorage, setStreamingMessage, showToast]);
 
     return (
         <div className={`h-screen w-full bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-gray-900 dark:to-indigo-950 transition-all duration-300 ${isExpanded ? 'p-0' : 'p-4'}`}>
@@ -414,7 +477,7 @@ const ChatArea = () => {
                                             onClick={() => loadChat(thread)}
                                             className="font-medium text-gray-900 dark:text-gray-100 cursor-pointer flex-1"
                                         >
-                                            {thread.title || 'Untitled Chat'} {/* Fallback title */}
+                                            {thread.title || 'Untitled Chat'}
                                         </h3>
                                     </div>
                                     <div className="flex items-center gap-4 text-sm text-gray-500">
@@ -486,9 +549,11 @@ const ChatArea = () => {
                                 />
                             ))}
                             {streamingMessage && (
-                                <div className="flex justify-start">
+                                <div key="streaming-message" className="flex justify-start">
                                     <div className="max-w-[80%] p-4 rounded-2xl shadow-md bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-100">
-                                        <p className="whitespace-pre-wrap leading-relaxed">{streamingMessage}</p>
+                                        <p className="whitespace-pre-wrap leading-relaxed animate-typing">
+                                            {streamingMessage}
+                                        </p>
                                     </div>
                                 </div>
                             )}

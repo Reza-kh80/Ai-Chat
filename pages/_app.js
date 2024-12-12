@@ -21,7 +21,7 @@ function MyApp({ Component, pageProps }) {
         }
 
         if (activeUser.active && token && publicRoutes.includes(router.pathname)) {
-          router.push('/dashboard');
+          router.push('/');
           setIsLoading(false);
           return;
         }

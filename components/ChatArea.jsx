@@ -26,6 +26,7 @@ const ChatArea = () => {
     const [currentChat, setCurrentChat] = useState(null);
     const [isExpanded, setIsExpanded] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [isNewChat, setIsNewChat] = useState(false);
     const [prompt, setPrompt] = useState('');
     const [chats, setChats] = useState([]);
 
@@ -46,6 +47,20 @@ const ChatArea = () => {
         }
     }, [currentChat, scrollToBottom]);
 
+    useEffect(() => {
+        const loadChats = async () => {
+            try {
+                const response = await axiosInstance.get('/chats');
+                if (response.data) {
+                    setChats(response.data.chats);
+                }
+            } catch (error) {
+                console.error('Error loading chats:', error);
+            }
+        };
+        loadChats();
+    }, []);
+
     const convertImageToBase64 = useCallback((file) => {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -53,69 +68,6 @@ const ChatArea = () => {
             reader.onerror = reject;
             reader.readAsDataURL(file);
         });
-    }, []);
-
-    const processMessageWithLLM = useCallback(async (messages, imageBase64 = null, chatTitle = '') => {
-        try {
-            setIsLoading(true);
-            const formattedMessages = messages.map(msg => ({
-                role: msg.role,
-                content: msg.image
-                    ? `${msg.content}\n[Attached image: ${msg.image.substring(0, 100)}...]`
-                    : msg.content
-            }));
-
-            const response = await axiosInstance.post('/chat', {
-                title: chatTitle, // Added chatTitle here
-                messages: formattedMessages,
-                category: ''
-            }, {
-                responseType: 'stream'
-            });
-
-            const reader = response.data.getReader();
-            const decoder = new TextDecoder();
-            let assistantMessage = { role: 'assistant', content: '', id: Date.now() };
-            let buffer = '';
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                const chunk = decoder.decode(value);
-                const lines = chunk.split('\n').filter(line => line.trim() !== '');
-
-                for (const line of lines) {
-                    if (line.includes('[DONE]')) continue;
-                    if (line.startsWith('data: ')) {
-                        try {
-                            const data = JSON.parse(line.slice(6));
-                            if (data.choices?.[0]?.delta?.content) {
-                                buffer += data.choices[0].delta.content;
-                                assistantMessage.content = buffer;
-                                setStreamingMessage(buffer);
-                            }
-                        } catch (error) {
-                            console.error('Error parsing stream:', error);
-                        }
-                    }
-                }
-            }
-
-            assistantMessage.timestamp = new Date().toISOString();
-            return assistantMessage;
-        } catch (error) {
-            console.error('Error processing message:', error);
-            throw error;
-        } finally {
-            setIsLoading(false);
-            setStreamingMessage('');
-        }
-    }, []);
-
-    const saveChatsToLocalStorage = useCallback((updatedChats) => {
-        localStorage.setItem('chats', JSON.stringify(updatedChats));
-        setChats(updatedChats);
     }, []);
 
     const handleImageUpload = useCallback(async (e) => {
@@ -148,6 +100,64 @@ const ChatArea = () => {
             }
         }
     }, [prompt]);
+
+    const timeSince = useMemo(() => (dateString) => {
+        const date = new Date(dateString.replace(' ', 'T'));
+
+        const seconds = Math.floor((new Date() - date) / 1000);
+        const intervals = [
+            { seconds: 31536000, label: "years" },
+            { seconds: 2592000, label: "months" },
+            { seconds: 86400, label: "days" },
+            { seconds: 3600, label: "hours" },
+            { seconds: 60, label: "minutes" },
+            { seconds: 1, label: "seconds" }
+        ];
+
+        for (let interval of intervals) {
+            const count = Math.floor(seconds / interval.seconds);
+            if (count >= 1) {
+                return count === 1
+                    ? `${count} ${interval.label.slice(0, -1)}`
+                    : `${count} ${interval.label}`;
+            }
+        }
+        return "just now";
+    }, []);
+
+    const createNewChat = useCallback(async () => {
+        try {
+            const response = await axiosInstance.post('/chats', { title: '', category: 'General' });
+            const newChat = response.data.chat;
+            setCurrentChat(newChat);
+            setChats((prev) => [newChat, ...prev]);
+            setSidebarOpen(false);
+            loadChat(newChat);
+        } catch (error) {
+            console.error('Error creating chat:', error);
+            showToast({ type: 'error', message: 'Failed to create new chat' });
+        }
+    }, []);
+
+    const loadChat = useCallback((chat) => {
+        setCurrentChat(chat);
+        setSidebarOpen(false);
+        setTimeout(scrollToBottom, 100);
+    }, [scrollToBottom]);
+
+    const deleteChat = async (chatId) => {
+        try {
+            const response = await axiosInstance.delete(`/chats/${chatId}`);
+            setChats((prev) => prev.filter((chat) => chat.id !== chatId));
+            if (currentChat?.id === chatId) {
+                setCurrentChat(null);
+            }
+            showToast({ type: 'success', message: response.data.message });
+        } catch (error) {
+            console.error('Error deleting chat:', error);
+            showToast({ type: 'error', message: 'Failed to delete chat' });
+        }
+    };
 
     const handleSubmit = useCallback(async (e, imageBase64 = null) => {
         if (e) e.preventDefault();
@@ -204,7 +214,7 @@ const ChatArea = () => {
                                 assistantMessage += data.content;
                                 setStreamingMessage(assistantMessage);
                                 // Add a small delay to make the streaming appear more natural
-                                await new Promise(resolve => setTimeout(resolve, 10));
+                                await new Promise(resolve => setTimeout(resolve, 30));
                                 break;
 
                             case 'done':
@@ -253,78 +263,6 @@ const ChatArea = () => {
         }
     }, [prompt, isLoading, currentChat, selectedImage, showToast]);
 
-    useEffect(() => {
-        const loadChats = async () => {
-            try {
-                const response = await axiosInstance.get('/chats');
-                if (response.data) {
-                    setChats(response.data.chats);
-                }
-            } catch (error) {
-                console.error('Error loading chats:', error);
-            }
-        };
-        loadChats();
-    }, []);
-
-    const createNewChat = useCallback(async () => {
-        try {
-            const response = await axiosInstance.post('/chats', { title: '', category: 'General' });
-            const newChat = response.data.chat;
-            setCurrentChat(newChat);
-            setChats((prev) => [newChat, ...prev]);
-            setSidebarOpen(false);
-            loadChat(newChat);
-        } catch (error) {
-            console.error('Error creating chat:', error);
-            showToast({ type: 'error', message: 'Failed to create new chat' });
-        }
-    }, []);
-
-    const loadChat = useCallback((chat) => {
-        setCurrentChat(chat);
-        setSidebarOpen(false);
-        setTimeout(scrollToBottom, 100);
-    }, [scrollToBottom]);
-
-    const timeSince = useMemo(() => (dateString) => {
-        const date = new Date(dateString.replace(' ', 'T'));
-
-        const seconds = Math.floor((new Date() - date) / 1000);
-        const intervals = [
-            { seconds: 31536000, label: "years" },
-            { seconds: 2592000, label: "months" },
-            { seconds: 86400, label: "days" },
-            { seconds: 3600, label: "hours" },
-            { seconds: 60, label: "minutes" },
-            { seconds: 1, label: "seconds" }
-        ];
-
-        for (let interval of intervals) {
-            const count = Math.floor(seconds / interval.seconds);
-            if (count >= 1) {
-                return count === 1
-                    ? `${count} ${interval.label.slice(0, -1)}`
-                    : `${count} ${interval.label}`;
-            }
-        }
-        return "just now";
-    }, []);
-
-    const deleteChat = async (chatId) => {
-        try {
-            const response = await axiosInstance.delete(`/chats/${chatId}`);
-            setChats((prev) => prev.filter((chat) => chat.id !== chatId));
-            if (currentChat?.id === chatId) {
-                setCurrentChat(null);
-            }
-            showToast({ type: 'success', message: response.data.message });
-        } catch (error) {
-            console.error('Error deleting chat:', error);
-            showToast({ type: 'error', message: 'Failed to delete chat' });
-        }
-    };
-
     const handleMessageEdit = useCallback(async (messageId, newContent) => {
         if (!currentChat) {
             showToast({ type: 'error', message: 'No active chat found' });
@@ -334,10 +272,8 @@ const ChatArea = () => {
         setProcessingMessageId(messageId);
 
         try {
-            // Find the index of the message being edited
             const editedMessageIndex = currentChat.messages.findIndex(msg => msg.id === messageId);
 
-            // Update the local state with the edited message immediately
             const updatedMessages = [...currentChat.messages];
             updatedMessages[editedMessageIndex] = {
                 ...updatedMessages[editedMessageIndex],
@@ -367,20 +303,18 @@ const ChatArea = () => {
                                 assistantMessage += data.content;
                                 setStreamingMessage(assistantMessage);
                                 // Add a small delay to make the streaming appear more natural
-                                await new Promise(resolve => setTimeout(resolve, 10));
+                                await new Promise(resolve => setTimeout(resolve, 30));
                                 break;
 
                             case 'done':
                                 setStreamingMessage('');
 
-                                // Find the index of the next assistant message after the edited message
                                 const nextAssistantMessageIndex = currentChat.messages.findIndex(
                                     (msg, index) =>
                                         msg.role === 'assistant' &&
                                         editedMessageIndex < index
                                 );
 
-                                // Create the updated messages array
                                 const finalMessages = nextAssistantMessageIndex !== -1
                                     ? [
                                         ...updatedMessages.slice(0, nextAssistantMessageIndex),
@@ -393,13 +327,11 @@ const ChatArea = () => {
                                     ]
                                     : updatedMessages;
 
-                                // Update current chat state
                                 setCurrentChat(prev => ({
                                     ...prev,
                                     messages: finalMessages
                                 }));
 
-                                // Update chats list
                                 setChats(prev =>
                                     prev.map(chat =>
                                         chat.id === currentChat.id
@@ -427,12 +359,11 @@ const ChatArea = () => {
             console.error('Error updating message:', error);
             showToast({ type: 'error', message: 'Failed to update message' });
 
-            // Revert local state if API call fails
             setCurrentChat(currentChat);
         } finally {
             setProcessingMessageId(null);
         }
-    }, [currentChat, chats, saveChatsToLocalStorage, setStreamingMessage, showToast]);
+    }, [currentChat, chats, setStreamingMessage, showToast]);
 
     return (
         <div className={`h-screen w-full bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-gray-900 dark:to-indigo-950 transition-all duration-300 ${isExpanded ? 'p-0' : 'p-4'}`}>
@@ -564,21 +495,24 @@ const ChatArea = () => {
                     {/* Input Area */}
                     <div className="p-6 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-t border-gray-100 dark:border-gray-800">
                         <form onSubmit={handleSubmit} className="max-w-3xl mx-auto relative">
-                            <div className="flex gap-2">
-                                <Button
-                                    type="button"
-                                    onClick={() => fileInputRef.current?.click()}
-                                    className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
-                                >
-                                    <ImageIcon className="h-5 w-5" />
-                                </Button>
-                                <input
-                                    type="file"
-                                    ref={fileInputRef}
-                                    onChange={handleImageUpload}
-                                    accept="image/*"
-                                    className="hidden"
-                                />
+                            <div className="relative">
+                                <div className="absolute left-2 top-1/2 transform -translate-y-1/2 flex items-center space-x-1 z-10">
+                                    <Button
+                                        type="button"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                                    >
+                                        <ImageIcon className="h-4 w-4" />
+                                    </Button>
+                                    {selectedImage && (
+                                        <Button
+                                            onClick={() => setSelectedImage(null)}
+                                            className="p-1 hover:bg-red-100 rounded-lg text-red-500 hover:text-red-700"
+                                        >
+                                            <X className="h-4 w-4" />
+                                        </Button>
+                                    )}
+                                </div>
                                 <Textarea
                                     value={prompt}
                                     onChange={(e) => setPrompt(e.target.value)}
@@ -590,23 +524,26 @@ const ChatArea = () => {
                                     }}
                                     placeholder="Ask anything..."
                                     rows="1"
-                                    className="flex-1 px-6 py-4 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700
-                    focus:ring-2 focus:ring-indigo-500 dark:focus:ring-purple-500 outline-none text-gray-900 dark:text-gray-100 placeholder-gray-400 resize-none"
+                                    className="pl-12 pr-16 py-4 flex-1 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700
+                    focus:ring-2 focus:ring-indigo-500 dark:focus:ring-purple-500 outline-none 
+                    text-gray-900 dark:text-gray-100 placeholder-gray-400 resize-none w-full"
                                     style={{
                                         minHeight: '56px',
                                         maxHeight: '200px',
                                         overflow: 'auto'
                                     }}
                                 />
-                                <Button
-                                    type="submit"
-                                    disabled={isLoading || (!prompt.trim() && !selectedImage)}
-                                    className="p-2 bg-gradient-to-r from-indigo-500 to-purple-500
-                   hover:from-indigo-600 hover:to-purple-600 text-white rounded-lg 
-                   shadow-lg transition-all duration-200 disabled:opacity-50"
-                                >
-                                    <Send className="h-5 w-5" />
-                                </Button>
+                                <div className="absolute right-2 top-1/2 transform -translate-y-1/2 z-10">
+                                    <Button
+                                        type="submit"
+                                        disabled={isLoading || (!prompt.trim() && !selectedImage)}
+                                        className="p-2 bg-gradient-to-r from-indigo-500 to-purple-500
+                    hover:from-indigo-600 hover:to-purple-600 text-white rounded-lg 
+                    shadow-lg transition-all duration-200 disabled:opacity-50"
+                                    >
+                                        <Send className="h-5 w-5" />
+                                    </Button>
+                                </div>
                             </div>
                             {selectedImage && (
                                 <div className="mt-2 relative">
@@ -618,15 +555,16 @@ const ChatArea = () => {
                                             objectFit="contain"
                                             className="rounded-lg"
                                         />
-                                        <Button
-                                            onClick={() => setSelectedImage(null)}
-                                            className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-600 rounded-full"
-                                        >
-                                            <X className="h-4 w-4 text-white" />
-                                        </Button>
                                     </div>
                                 </div>
                             )}
+                            {/* <input
+                                type="file"
+                                ref={fileInputRef}
+                                onChange={handleImageUpload}
+                                accept="image/*"
+                                className="hidden"
+                            /> */}
                         </form>
                     </div>
                 </div>

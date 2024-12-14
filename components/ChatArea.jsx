@@ -26,7 +26,7 @@ const ChatArea = () => {
     const [currentChat, setCurrentChat] = useState(null);
     const [isExpanded, setIsExpanded] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-    const [isNewChat, setIsNewChat] = useState(false);
+    const [tempChat, setTempChat] = useState(null);
     const [prompt, setPrompt] = useState('');
     const [chats, setChats] = useState([]);
 
@@ -125,18 +125,17 @@ const ChatArea = () => {
         return "just now";
     }, []);
 
-    const createNewChat = useCallback(async () => {
-        try {
-            const response = await axiosInstance.post('/chats', { title: '', category: 'General' });
-            const newChat = response.data.chat;
-            setCurrentChat(newChat);
-            setChats((prev) => [newChat, ...prev]);
-            setSidebarOpen(false);
-            loadChat(newChat);
-        } catch (error) {
-            console.error('Error creating chat:', error);
-            showToast({ type: 'error', message: 'Failed to create new chat' });
-        }
+    const createNewChat = useCallback(() => {
+        const tempNewChat = {
+            id: 'temp-' + Date.now(), // Temporary ID
+            title: '',
+            category: 'General',
+            messages: [],
+            isTemp: true // Flag to identify temporary chats
+        };
+        setTempChat(tempNewChat);
+        setCurrentChat(tempNewChat);
+        setSidebarOpen(false);
     }, []);
 
     const loadChat = useCallback((chat) => {
@@ -169,21 +168,44 @@ const ChatArea = () => {
         setIsLoading(true);
 
         const userMessage = {
-            id: currentChat.messages[currentChat.messages.length - 1]?.id + 1, // Add unique ID
+            id: Date.now(),
             content: prompt || '',
             role: 'user',
             image: imageBase64 || selectedImage,
         };
 
         try {
-            // Show user message immediately
+            let chatId;
+            let currentChatToUse = currentChat;
+
+            // اگر این یک چت موقت است یا چتی وجود ندارد، ابتدا یک چت جدید ایجاد می‌کنیم
+            if (!currentChat || currentChat?.isTemp) {
+                const chatTitle = prompt.trim().substring(0, 30) + (prompt.length > 30 ? '...' : '');
+                const response = await axiosInstance.post('/chats', {
+                    title: chatTitle,
+                    category: 'General'
+                });
+
+                currentChatToUse = response.data.chat;
+                chatId = response.data.chat.id;
+
+                // آپدیت state ها
+                setCurrentChat(currentChatToUse);
+                setChats(prev => [currentChatToUse, ...prev.filter(c => !c.isTemp)]);
+                setTempChat(null);
+            } else {
+                chatId = currentChat.id;
+            }
+
+            // نمایش پیام کاربر به صورت فوری
             setCurrentChat(prev => ({
                 ...prev,
                 messages: [...(prev?.messages || []), userMessage]
             }));
 
+            // ارسال پیام به سرور
             const response = await axiosInstance.post('/messages', {
-                chatId: currentChat?.id,
+                chatId: chatId,
                 content: prompt || '',
                 image: imageBase64 || selectedImage
             }, {
@@ -210,7 +232,6 @@ const ChatArea = () => {
                                 break;
 
                             case 'chunk':
-                                // Just append the content directly
                                 assistantMessage += data.content;
                                 setStreamingMessage(assistantMessage);
                                 await new Promise(resolve => setTimeout(resolve, 30));
@@ -219,20 +240,24 @@ const ChatArea = () => {
                             case 'done':
                                 setStreamingMessage('');
                                 const finalMessage = {
-                                    id: currentChat.messages[currentChat.messages.length - 1]?.id + 2,
+                                    id: Date.now(),
                                     content: data.content,
                                     role: 'assistant',
                                 };
+
+                                // آپدیت چت فعلی
                                 setCurrentChat(prev => ({
                                     ...prev,
                                     messages: [...prev.messages, finalMessage]
                                 }));
+
+                                // آپدیت لیست چت‌ها
                                 setChats(prev =>
                                     prev.map(chat =>
-                                        chat.id === currentChat.id
+                                        chat.id === chatId
                                             ? {
                                                 ...chat,
-                                                messages: [...chat.messages, finalMessage]
+                                                messages: [...(chat.messages || []), finalMessage]
                                             }
                                             : chat
                                     )
@@ -396,11 +421,11 @@ const ChatArea = () => {
                     {/* Threads List */}
                     <ScrollArea className="flex-1 px-4 py-6">
                         <div className="space-y-2">
-                            {chats.map(thread => (
+                            {chats.map(thread => !thread.isTemp && (
                                 <div
                                     key={thread.id}
                                     className="p-4 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800
-                                        transition-all duration-200 group"
+                            transition-all duration-200 group"
                                 >
                                     <div className="flex items-center justify-between mb-2">
                                         <h3
@@ -421,6 +446,16 @@ const ChatArea = () => {
                                     </div>
                                 </div>
                             ))}
+                            {tempChat && (
+                                <div className="p-4 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800
+                        transition-all duration-200 group opacity-50">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h3 className="font-medium text-gray-900 dark:text-gray-100">
+                                            New Chat
+                                        </h3>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </ScrollArea>
                 </div>

@@ -201,7 +201,6 @@ const ChatArea = () => {
 
                         switch (data.type) {
                             case 'init':
-                                // Don't update messages here, just other chat data
                                 const chatWithoutMessages = { ...data.chat };
                                 delete chatWithoutMessages.messages;
                                 setCurrentChat(prev => ({
@@ -211,9 +210,9 @@ const ChatArea = () => {
                                 break;
 
                             case 'chunk':
+                                // Just append the content directly
                                 assistantMessage += data.content;
                                 setStreamingMessage(assistantMessage);
-                                // Add a small delay to make the streaming appear more natural
                                 await new Promise(resolve => setTimeout(resolve, 30));
                                 break;
 

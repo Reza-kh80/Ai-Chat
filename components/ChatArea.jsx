@@ -16,6 +16,7 @@ import {
 import MessageBubble from '@/components/MessageBubble';
 import { showToast } from '@/ui_template/ui/toast';
 import axiosInstance from '@/lib/axiosInstance';
+import MessageLoader from './MessageLoader';
 const ChatArea = () => {
 
     const [processingMessageId, setProcessingMessageId] = useState(null);
@@ -167,18 +168,11 @@ const ChatArea = () => {
 
         setIsLoading(true);
 
-        const userMessage = {
-            id: Date.now(),
-            content: prompt || '',
-            role: 'user',
-            image: imageBase64 || selectedImage,
-        };
-
         try {
             let chatId;
             let currentChatToUse = currentChat;
 
-            // اگر این یک چت موقت است یا چتی وجود ندارد، ابتدا یک چت جدید ایجاد می‌کنیم
+            // Create a new chat if it's a temporary chat or if no chat exists
             if (!currentChat || currentChat?.isTemp) {
                 const chatTitle = prompt.trim().substring(0, 30) + (prompt.length > 30 ? '...' : '');
                 const response = await axiosInstance.post('/chats', {
@@ -189,7 +183,7 @@ const ChatArea = () => {
                 currentChatToUse = response.data.chat;
                 chatId = response.data.chat.id;
 
-                // آپدیت state ها
+                // Update states
                 setCurrentChat(currentChatToUse);
                 setChats(prev => [currentChatToUse, ...prev.filter(c => !c.isTemp)]);
                 setTempChat(null);
@@ -197,13 +191,28 @@ const ChatArea = () => {
                 chatId = currentChat.id;
             }
 
-            // نمایش پیام کاربر به صورت فوری
+            // Get the latest message ID
+            let lastMessageId = 0;
+            if (currentChatToUse?.messages?.length > 0) {
+                lastMessageId = currentChatToUse.messages[currentChatToUse.messages.length - 1].id;
+            } else if (chats.length > 0 && chats[0]?.messages?.length > 0) {
+                lastMessageId = chats[0].messages[chats[0].messages.length - 1].id;
+            }
+
+            const userMessage = {
+                id: lastMessageId + 1,
+                content: prompt || '',
+                role: 'user',
+                image: imageBase64 || selectedImage,
+            };
+
+            // Display user message immediately
             setCurrentChat(prev => ({
                 ...prev,
                 messages: [...(prev?.messages || []), userMessage]
             }));
 
-            // ارسال پیام به سرور
+            // Send message to server
             const response = await axiosInstance.post('/messages', {
                 chatId: chatId,
                 content: prompt || '',
@@ -240,18 +249,18 @@ const ChatArea = () => {
                             case 'done':
                                 setStreamingMessage('');
                                 const finalMessage = {
-                                    id: Date.now(),
+                                    id: lastMessageId + 2,
                                     content: data.content,
                                     role: 'assistant',
                                 };
 
-                                // آپدیت چت فعلی
+                                // Update current chat
                                 setCurrentChat(prev => ({
                                     ...prev,
-                                    messages: [...prev.messages, finalMessage]
+                                    messages: [...(prev?.messages || []), finalMessage]
                                 }));
 
-                                // آپدیت لیست چت‌ها
+                                // Update chats list
                                 setChats(prev =>
                                     prev.map(chat =>
                                         chat.id === chatId
@@ -285,7 +294,7 @@ const ChatArea = () => {
                 fileInputRef.current.value = '';
             }
         }
-    }, [prompt, isLoading, currentChat, selectedImage, showToast]);
+    }, [prompt, isLoading, currentChat, selectedImage, chats]);
 
     const handleMessageEdit = useCallback(async (messageId, newContent) => {
         if (!currentChat) {
@@ -401,7 +410,7 @@ const ChatArea = () => {
                     <div className="p-6 border-b border-gray-100 dark:border-gray-800">
                         <div className="flex items-center justify-between mb-6">
                             <h1 className="text-2xl font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                                Chatter AI
+                                FitTech AI
                             </h1>
                             <Button onClick={() => setSidebarOpen(false)} className="lg:hidden px-0">
                                 <X className="h-5 w-5 text-gray-500" />
@@ -514,18 +523,18 @@ const ChatArea = () => {
                                 />
                             ))}
                             {streamingMessage && (
-                                <div key="streaming-message" className="flex justify-start">
-                                    <div className="max-w-[80%] p-4 rounded-2xl shadow-md bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-100">
-                                        <p className="whitespace-pre-wrap leading-relaxed animate-typing">
-                                            {streamingMessage}
-                                        </p>
-                                    </div>
-                                </div>
+                                <MessageBubble
+                                    message={{
+                                        role: 'assistant',
+                                        content: streamingMessage,
+                                        id: 'streaming'
+                                    }}
+                                />
                             )}
+                            {isLoading && <MessageLoader />}
                             <div ref={messagesEndRef} />
                         </div>
                     </ScrollArea>
-
                     {/* Input Area */}
                     <div className="p-6 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-t border-gray-100 dark:border-gray-800">
                         <form onSubmit={handleSubmit} className="max-w-3xl mx-auto relative">

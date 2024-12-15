@@ -5,12 +5,15 @@
 :root {
   --background: theme('colors.white');
   --text: theme('colors.cyan.900');
+  --loader: #b0b1f7;
 }
 
 [class='dark'] {
   --background: theme('colors.gray.900');
   --text: theme('colors.cyan.50');
+  --loader: #ffffff;
 }
+
 body {
   background-color: var(--background);
   color: var(--text);
@@ -46,13 +49,18 @@ body {
 
 .bg-grid-slate-100 {
   background-image: linear-gradient(to right, rgba(55, 65, 81, 0.1) 1px, transparent 1px),
-  linear-gradient(to bottom, rgba(55, 65, 81, 0.1) 1px, transparent 1px);
+    linear-gradient(to bottom, rgba(55, 65, 81, 0.1) 1px, transparent 1px);
   background-size: 20px 20px;
 }
 
 @keyframes typing {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 .animate-typing {
@@ -65,31 +73,34 @@ body {
   border-radius: 50%;
   width: 48px;
   height: 48px;
-  color: #fff;
+  color: var(--loader);
 }
-  .loader:before,
-  .loader:after {
-    content: '';
-    display: block;
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: inherit;
-    height: inherit;
-    border-radius: 50%;
-    transform: rotateX(70deg);
-    animation: 1s spin linear infinite;
-  }
-  .loader:after {
-    color: #54537e;
-    transform: rotateY(70deg);
-    animation-delay: .4s;
-  }
+
+.loader:before,
+.loader:after {
+  content: '';
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: inherit;
+  height: inherit;
+  border-radius: 50%;
+  transform: rotateX(70deg);
+  animation: 1s spin linear infinite;
+}
+
+.loader:after {
+  color: #6366f1;
+  transform: rotateY(70deg);
+  animation-delay: .4s;
+}
 
 @keyframes rotate {
   0% {
     transform: translate(-50%, -50%) rotateZ(0deg);
   }
+
   100% {
     transform: translate(-50%, -50%) rotateZ(360deg);
   }
@@ -99,34 +110,43 @@ body {
   0% {
     transform: translate(-50%, -50%) rotate(0deg);
   }
+
   100% {
     transform: translate(-50%, -50%) rotate(-360deg);
   }
 }
 
 @keyframes spin {
+
   0%,
   100% {
     box-shadow: .2em 0px 0 0px currentcolor;
   }
+
   12% {
     box-shadow: .2em .2em 0 0 currentcolor;
   }
+
   25% {
     box-shadow: 0 .2em 0 0px currentcolor;
   }
+
   37% {
     box-shadow: -.2em .2em 0 0 currentcolor;
   }
+
   50% {
     box-shadow: -.2em 0 0 0 currentcolor;
   }
+
   62% {
     box-shadow: -.2em -.2em 0 0 currentcolor;
   }
+
   75% {
     box-shadow: 0px -.2em 0 0 currentcolor;
   }
+
   87% {
     box-shadow: .2em -.2em 0 0 currentcolor;
   }

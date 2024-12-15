@@ -122,7 +122,7 @@ const MessageBubble = ({ message, onEdit, onDelete, isProcessing }) => {
                 {message.role === 'user' && !isEditing && (
                     <div className="absolute -left-12 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Button variant="ghost" size="sm" className="h-8 w-8 p-1">
-                            <Edit className="h-4 w-4" onClick={() => setIsEditing(true)} />
+                            <Edit className="h-4 w-4 text-gray-700 dark:text-white" onClick={() => setIsEditing(true)} />
                         </Button>
                     </div>
                 )}

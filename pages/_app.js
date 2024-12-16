@@ -62,7 +62,6 @@ function MyApp({ Component, pageProps }) {
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width,initial-scale=1" />
         <meta name="description" content={APP_DESCRIPTION} />
-        <title>{APP_NAME}</title>
 
         {/* PWA essential tags */}
         <meta name="application-name" content={APP_NAME} />

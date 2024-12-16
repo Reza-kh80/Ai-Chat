@@ -46,6 +46,10 @@ module.exports = {
 					800: '#9a3412',
 					900: '#7c2d12',
 				}
+			},
+			fontFamily: {
+				mikhak: ['Mikhak', 'system-ui', 'sans-serif'],
+				'mikhak-vf': ['Mikhak VF', 'Mikhak', 'system-ui', 'sans-serif'],
 			}
 		},
 	},

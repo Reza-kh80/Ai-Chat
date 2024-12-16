@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { Edit, Copy, Check } from 'lucide-react';
 
@@ -6,11 +6,26 @@ import { Edit, Copy, Check } from 'lucide-react';
 import { Textarea } from '@/ui_template/ui/textarea';
 import { Button } from '@/ui_template/ui/button';
 
+const getTextDirection = (text) => {
+    const rtlChars = /[\u0591-\u07FF\u200F\u202B\u202E\uFB1D-\uFDFD\uFE70-\uFEFC]/;
+    const ltrChars = /[A-Za-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02B8]/;
+
+    if (rtlChars.test(text)) {
+        return 'rtl';
+    } else if (ltrChars.test(text)) {
+        return 'ltr';
+    }
+    return 'ltr';
+};
 const MessageBubble = ({ message, onEdit, onDelete, isProcessing }) => {
-    const [isEditing, setIsEditing] = useState(false);
     const [editedContent, setEditedContent] = useState(message.content);
+    const [textDirection, setTextDirection] = useState('ltr');
+    const [isEditing, setIsEditing] = useState(false);
     const [copyStatus, setCopyStatus] = useState({});
 
+    useEffect(() => {
+        setTextDirection(getTextDirection(message.content));
+    }, [message.content]);
     const handleSave = async () => {
         if (editedContent !== message.content) {
             await onEdit(message.id, editedContent);
@@ -38,24 +53,31 @@ const MessageBubble = ({ message, onEdit, onDelete, isProcessing }) => {
 
         while ((match = codeBlockRegex.exec(message.content)) !== null) {
             if (match.index > lastIndex) {
+                const textPart = message.content.slice(lastIndex, match.index);
+                const textDirection = getTextDirection(textPart);
                 parts.push({
                     type: 'text',
-                    content: message.content.slice(lastIndex, match.index)
+                    content: textPart,
+                    direction: textDirection
                 });
             }
 
             parts.push({
                 type: 'code',
-                content: match[0].slice(3, -3)
+                content: match[0].slice(3, -3),
+                direction: 'ltr' // Code blocks are always LTR
             });
 
             lastIndex = match.index + match[0].length;
         }
 
         if (lastIndex < message.content.length) {
+            const remainingText = message.content.slice(lastIndex);
+            const textDirection = getTextDirection(remainingText);
             parts.push({
                 type: 'text',
-                content: message.content.slice(lastIndex)
+                content: remainingText,
+                direction: textDirection
             });
         }
 
@@ -68,7 +90,8 @@ const MessageBubble = ({ message, onEdit, onDelete, isProcessing }) => {
                                 <pre className="bg-gray-200 dark:bg-gray-700 p-4 rounded-lg 
                                               text-sm whitespace-pre-wrap break-words
                                               overflow-x-auto scrollbar-thin scrollbar-thumb-gray-400 
-                                              scrollbar-track-gray-200">
+                                              scrollbar-track-gray-200 leading-7"
+                                    dir="ltr">
                                     <code>{part.content}</code>
                                 </pre>
                             </div>
@@ -100,13 +123,22 @@ const MessageBubble = ({ message, onEdit, onDelete, isProcessing }) => {
                     );
                 }
                 return (
-                    <p key={index} className="text-sm leading-relaxed whitespace-pre-wrap">
+                    <p key={index}
+                        className="text-sm leading-8 whitespace-pre-wrap"
+                        style={{
+                            textAlign: part.direction === 'rtl' ? 'right' : 'left',
+                            direction: part.direction
+                        }}>
                         {part.content}
                     </p>
                 );
             })
         ) : (
-            <p className="text-sm leading-relaxed whitespace-pre-wrap">
+            <p className="text-sm leading-8 whitespace-pre-wrap"
+                style={{
+                    textAlign: textDirection === 'rtl' ? 'right' : 'left',
+                    direction: textDirection
+                }}>
                 {message.content}
             </p>
         );
@@ -147,13 +179,20 @@ const MessageBubble = ({ message, onEdit, onDelete, isProcessing }) => {
                         <div className="space-y-2 transition-all duration-300">
                             <Textarea
                                 value={editedContent}
-                                onChange={(e) => setEditedContent(e.target.value)}
-                                className="min-h-[100px] w-full p-3 rounded-xl
-                                border-2 border-indigo-200 focus:border-indigo-400
-                                dark:bg-gray-800 dark:border-gray-700
-                                transition-all duration-200
-                                shadow-inner resize-none
-                                focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-800"
+                                onChange={(e) => {
+                                    setEditedContent(e.target.value);
+                                    setTextDirection(getTextDirection(e.target.value));
+                                }}
+                                className="min-h-[100px] w-full p-3 rounded-xl text-gray-700 dark:text-white
+                                     border-2 border-indigo-200 focus:border-indigo-400
+                                     dark:bg-gray-800 dark:border-gray-700
+                                     transition-all duration-200
+                                     shadow-inner resize-none
+                                     focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-800"
+                                style={{
+                                    textAlign: textDirection === 'rtl' ? 'right' : 'left',
+                                    direction: textDirection
+                                }}
                                 placeholder="Edit your message..."
                             />
                             <div className="flex justify-end gap-3">

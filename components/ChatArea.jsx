@@ -17,11 +17,30 @@ import MessageBubble from '@/components/MessageBubble';
 import { showToast } from '@/ui_template/ui/toast';
 import axiosInstance from '@/lib/axiosInstance';
 import MessageLoader from './MessageLoader';
+
+const getTextDirection = (text) => {
+    // Regular expressions for RTL scripts (Arabic, Persian, Hebrew)
+    const rtlChars = /[\u0591-\u07FF\u200F\u202B\u202E\uFB1D-\uFDFD\uFE70-\uFEFC]/;
+    // Regular expressions for LTR scripts (Latin, Cyrillic, etc.)
+    const ltrChars = /[A-Za-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02B8]/;
+
+    // Check if the text contains RTL characters
+    if (rtlChars.test(text)) {
+        return 'rtl';
+    }
+    // Check if the text contains LTR characters
+    else if (ltrChars.test(text)) {
+        return 'ltr';
+    }
+    // Default to LTR if no clear direction is detected
+    return 'ltr';
+};
 const ChatArea = () => {
 
     const [processingMessageId, setProcessingMessageId] = useState(null);
     const [showImageUpload, setShowImageUpload] = useState(false);
     const [streamingMessage, setStreamingMessage] = useState('');
+    const [textDirection, setTextDirection] = useState('ltr');
     const [selectedImage, setSelectedImage] = useState(null);
     const [isSidebarOpen, setSidebarOpen] = useState(false);
     const [currentChat, setCurrentChat] = useState(null);
@@ -37,6 +56,10 @@ const ChatArea = () => {
     const scrollToBottom = useCallback(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, []);
+
+    useEffect(() => {
+        setTextDirection(getTextDirection(prompt));
+    }, [prompt]);
 
     useEffect(() => {
         scrollToBottom();
@@ -439,7 +462,7 @@ const ChatArea = () => {
                                     <div className="flex items-center justify-between mb-2">
                                         <h3
                                             onClick={() => loadChat(thread)}
-                                            className="font-medium text-gray-900 dark:text-gray-100 cursor-pointer flex-1"
+                                            className="font-mikhak text-gray-900 dark:text-gray-100 cursor-pointer flex-1"
                                         >
                                             {thread.title || 'Untitled Chat'}
                                         </h3>
@@ -504,7 +527,7 @@ const ChatArea = () => {
 
                     {/* Messages Area */}
                     <ScrollArea className="flex-1 p-6">
-                        <div className="max-w-3xl mx-auto space-y-6">
+                        <div className="max-w-4xl mx-auto space-y-6">
                             {currentChat?.messages.map((message) => (
                                 <MessageBubble
                                     key={message.id}
@@ -567,13 +590,13 @@ const ChatArea = () => {
                                     }}
                                     placeholder="Ask anything..."
                                     rows="1"
-                                    className="pl-12 pr-16 py-4 flex-1 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700
-                    focus:ring-2 focus:ring-indigo-500 dark:focus:ring-purple-500 outline-none 
-                    text-gray-900 dark:text-gray-100 placeholder-gray-400 resize-none w-full"
+                                    className={`pl-12 pr-16 py-4 flex-1 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700
+        focus:ring-2 focus:ring-indigo-500 dark:focus:ring-purple-500 outline-none 
+        text-gray-900 dark:text-gray-100 placeholder-gray-400 resize-none w-full
+        ${textDirection === 'rtl' ? 'text-right' : 'text-left'}`}
+                                    dir={textDirection}
                                     style={{
-                                        minHeight: '56px',
-                                        maxHeight: '200px',
-                                        overflow: 'auto'
+                                        minHeight: "3rem",
                                     }}
                                 />
                                 <div className="absolute right-2 top-1/2 transform -translate-y-1/2 z-10">

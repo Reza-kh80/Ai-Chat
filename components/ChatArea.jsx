@@ -116,10 +116,11 @@ const ChatArea = () => {
             setIsLoading(true);
 
             try {
+                setPrompt('');
                 let chatId;
                 let currentChatToUse = currentChat;
 
-                // Create a new chat if it's a temporary chat or if no chat exists
+                // Inside handleSubmit function, in the "Create a new chat" section:
                 if (!currentChat || currentChat?.isTemp) {
                     const chatTitle =
                         prompt.trim().substring(0, 30) +
@@ -139,6 +140,9 @@ const ChatArea = () => {
                         ...prev.filter((c) => !c.isTemp),
                     ]);
                     setTempChat(null);
+
+                    // Update URL without triggering a full navigation
+                    window.history.pushState({}, '', `/chat/${chatId}`);
                 } else {
                     chatId = currentChat.id;
                 }
@@ -245,6 +249,7 @@ const ChatArea = () => {
                         }
                     }
                 }
+
             } catch (error) {
                 console.error('Error:', error);
                 showToast({
@@ -300,7 +305,6 @@ const ChatArea = () => {
 
     // --- Chat Management Functions ---
     const createNewChat = useCallback(() => {
-        router.replace('/ai-chat');
         const tempNewChat = {
             id: `temp-${Date.now()}`,
             title: '',
@@ -311,6 +315,9 @@ const ChatArea = () => {
         setTempChat(tempNewChat);
         setCurrentChat(tempNewChat);
         setSidebarOpen(false);
+
+        // Update URL immediately when creating a new chat
+        router.replace('/ai-chat', { scroll: false });
     }, [router]);
 
     const loadChat = useCallback(
@@ -367,6 +374,7 @@ const ChatArea = () => {
             if (currentChat?.id === chatId) {
                 setCurrentChat(null);
             }
+            router.replace('/ai-chat', { scroll: false });
             showToast({ type: 'success', message: response.data.message });
         } catch (error) {
             console.error('Error deleting chat:', error);

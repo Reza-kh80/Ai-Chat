@@ -97,7 +97,7 @@ const ChatSidebar = ({
                                         </span>
                                         <div className="flex items-center gap-1.5 text-gray-500">
                                             <Clock className="h-3.5 w-3.5" />
-                                            <span className="text-xs">{timeSince(thread.lastUpdate)}</span>
+                                            <span className="text-xs">{timeSince(thread.lastUpdate)} ago</span>
                                         </div>
                                     </div>
                                 </div>

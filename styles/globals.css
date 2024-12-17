@@ -146,6 +146,37 @@ body {
   animation-delay: .4s;
 }
 
+.markdown-content {
+  /* Override default margins for nested elements */
+  & > *:first-child {
+      margin-top: 0;
+  }
+  & > *:last-child {
+      margin-bottom: 0;
+  }
+  
+  /* Style links */
+  a {
+      color: #3b82f6;
+      text-decoration: underline;
+  }
+  
+  /* Style headings */
+  h1, h2, h3, h4, h5, h6 {
+      font-weight: 600;
+      margin-top: 1.5em;
+      margin-bottom: 0.5em;
+  }
+  
+  /* Style code blocks */
+  code {
+      background-color: rgba(0, 0, 0, 0.05);
+      padding: 0.2em 0.4em;
+      border-radius: 3px;
+      font-size: 0.9em;
+  }
+}
+
 @keyframes rotate {
   0% {
     transform: translate(-50%, -50%) rotateZ(0deg);

@@ -230,6 +230,7 @@ const ChatArea = ({ initialChat }) => {
                                         id: lastMessageId + 2,
                                         content: data.content,
                                         role: 'assistant',
+                                        images: data.url ? data.url : [],
                                     };
 
                                     // Update current chat
@@ -473,6 +474,7 @@ const ChatArea = ({ initialChat }) => {
                                                     id: updatedMessages[nextAssistantMessageIndex].id,
                                                     content: data.content,
                                                     role: 'assistant',
+                                                    images: data.url ? data.url : [],
                                                 },
                                                 ...updatedMessages.slice(nextAssistantMessageIndex + 1),
                                             ]

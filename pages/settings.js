@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
+import { parseCookies } from 'nookies';
 
 // import components
 import Layout from '@/components/Layout';
 import Settings from '@/components/Settings';
+import MessageLoader from '@/components/MessageLoader';
 
 const settings = () => {
     const [user, setUser] = useState(null);
 
     useEffect(() => {
-        const storedUser = JSON.parse(localStorage.getItem('user'));
-        console.log(storedUser);
+        const cookies = parseCookies();
+        const storedUser = JSON.parse(cookies.user);
         setUser(storedUser);
     }, []);
 
@@ -17,7 +19,7 @@ const settings = () => {
     if (!user) {
         return (
             <Layout title='Settings'>
-                <div>Loading...</div>
+                <MessageLoader />
             </Layout>
         );
     }

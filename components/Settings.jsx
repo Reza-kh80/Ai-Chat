@@ -5,6 +5,7 @@ import { useTheme, themes } from '@/contexts/ThemeContext ';
 import { useRouter } from 'next/router';
 import { showToast } from '@/ui_template/ui/toast';
 import axiosInstance from '@/lib/axiosInstance';
+import nookies from 'nookies';
 
 const Settings = ({ email, active }) => {
     const { theme, setTheme } = useTheme();
@@ -26,8 +27,8 @@ const Settings = ({ email, active }) => {
         axiosInstance.post('/users/logout')
             .then((res) => {
                 if (res.status === 200) {
-                    localStorage.setItem('user', JSON.stringify({ email: '', active: false }));
-                    localStorage.removeItem('token');
+                    nookies.destroy(null, 'token');
+                    nookies.destroy(null, 'user');
                     showToast({ message: res?.data?.message, type: "success" });
                     push('/');
                 } else if (res.status === 404) {
@@ -42,6 +43,7 @@ const Settings = ({ email, active }) => {
                 });
             });
     };
+
     return (
         <div className="px-6 py-5 mt-auto border-t border-primary-200/30 dark:border-primary-800/30 ocean:border-accent-800/30 backdrop-blur-sm">
             <div className="space-y-5">

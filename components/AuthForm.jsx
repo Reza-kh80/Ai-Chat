@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/router';
 import { showToast } from '@/ui_template/ui/toast';
 import axiosInstance from '@/lib/axiosInstance';
+import { setCookie } from 'nookies';
 
 const AuthForm = () => {
     const { push } = useRouter();
@@ -59,8 +60,23 @@ const AuthForm = () => {
         try {
             const response = await axiosInstance.post('/users/login', loginData);
 
-            localStorage.setItem('token', response.data.token);
-            localStorage.setItem('user', JSON.stringify({ email: response.data.email, active: true }));
+            setCookie(null, 'token', response.data.token, {
+                maxAge: 30 * 24 * 60 * 60, // 30 days
+                path: '/',
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'strict'
+            });
+
+            setCookie(null, 'user', JSON.stringify({
+                email: response.data.email,
+                active: true
+            }), {
+                maxAge: 30 * 24 * 60 * 60,
+                path: '/',
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'strict'
+            });
+            
             showToast({ message: response?.data?.message, type: "success" });
             push('/ai-chat');
         } catch (error) {

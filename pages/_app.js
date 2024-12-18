@@ -4,56 +4,28 @@ import { useRouter } from "next/router";
 import "@/styles/globals.css";
 import Head from "next/head";
 import axiosInstance from "@/lib/axiosInstance";
+import nookies from 'nookies';
+import MessageLoader from "@/components/MessageLoader";
 
-function MyApp({ Component, pageProps }) {
+function MyApp({ Component, pageProps, isAuthenticated }) {
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
   const APP_NAME = "FitTech AI";
   const APP_DESCRIPTION = "A smart fitness assistant combining AI with personalized workout and health recommendations.";
 
-  const verifyToken = async (token) => {
-    try {
-      const response = await axiosInstance.get('/users/verify-auth');
-
-      const data = await response.data;
-      return data.valid;
-    } catch (error) {
-      console.error('Token verification error:', error);
-      return false;
-    }
-  };
-
   useEffect(() => {
-    const checkAuth = async () => {
+    const handleClientSideRouting = async () => {
       try {
         const publicRoutes = ['/', '/authentication'];
-        const token = localStorage.getItem('token');
-        const activeUser = JSON.parse(localStorage.getItem('user') || '{"active": false}');
 
-        if (!token || !activeUser.active) {
-          if (!publicRoutes.includes(router.pathname)) {
-            router.push('/authentication');
-          }
-          setIsLoading(false);
-          return;
-        }
-
-        // Verify token validity
-        const isTokenValid = await verifyToken(token);
-
-        if (!isTokenValid) {
-          // Clear invalid token and user data
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-
+        if (!isAuthenticated) {
           if (!publicRoutes.includes(router.pathname)) {
             router.push('/authentication');
           }
         } else if (publicRoutes.includes(router.pathname)) {
-          router.push('/ai-chat'); // or your main authenticated route
+          router.push('/ai-chat');
         }
-
       } catch (error) {
         console.error('Auth check error:', error);
         router.push('/authentication');
@@ -62,10 +34,10 @@ function MyApp({ Component, pageProps }) {
       }
     };
 
-    checkAuth();
+    handleClientSideRouting();
 
     const handleRouteChange = () => {
-      checkAuth();
+      handleClientSideRouting();
     };
 
     router.events.on('routeChangeComplete', handleRouteChange);
@@ -73,12 +45,12 @@ function MyApp({ Component, pageProps }) {
     return () => {
       router.events.off('routeChangeComplete', handleRouteChange);
     };
-  }, [router]);
+  }, [router, isAuthenticated]);
 
   if (isLoading) {
     return (
-      <div className="loading-screen">
-        <p>Loading...</p>
+      <div className="loading-screen flex items-center justify-center h-screen bg-gray-100">
+        <MessageLoader />
       </div>
     );
   }
@@ -104,5 +76,47 @@ function MyApp({ Component, pageProps }) {
     </ThemeProvider>
   );
 }
+
+MyApp.getInitialProps = async (appContext) => {
+  const { ctx } = appContext;
+  let pageProps = {};
+
+  // Get the cookies from the context
+  const cookies = nookies.get(ctx);
+  const token = cookies.token;
+
+  const verifyToken = async (token) => {
+    try {
+      const response = await axiosInstance.get('/users/verify-auth', {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      return response.data.valid;
+    } catch (error) {
+      console.error('Token verification error:', error);
+      return false;
+    }
+  };
+
+  let isAuthenticated = false;
+
+  if (token) {
+    isAuthenticated = await verifyToken(token);
+
+    // If token is invalid, clear it from cookies
+    if (!isAuthenticated && ctx.res) {
+      nookies.destroy(ctx, 'token');
+      nookies.destroy(ctx, 'user');
+    }
+  }
+
+  // If Component.getInitialProps exists, call it
+  if (appContext.Component.getInitialProps) {
+    pageProps = await appContext.Component.getInitialProps(ctx);
+  }
+
+  return { pageProps, isAuthenticated };
+};
 
 export default MyApp;

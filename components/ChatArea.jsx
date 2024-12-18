@@ -45,7 +45,7 @@ const timeSince = (dateString) => {
     return 'just now';
 };
 
-const ChatArea = () => {
+const ChatArea = ({ initialChat }) => {
     const router = useRouter();
     const params = useParams();
 
@@ -81,6 +81,12 @@ const ChatArea = () => {
     }, [streamingMessage, scrollToBottom]);
 
     useEffect(() => {
+        if (initialChat) {
+            setCurrentChat(initialChat);
+        }
+    }, [initialChat]);
+
+    useEffect(() => {
         if (currentChat?.messages?.length > 0) {
             scrollToBottom();
         }
@@ -91,7 +97,18 @@ const ChatArea = () => {
             try {
                 const response = await axiosInstance.get('/chats');
                 if (response.data?.chats) {
-                    setChats(response.data.chats);
+                    const loadedChats = response.data.chats;
+                    setChats(loadedChats);
+
+                    // If we have an initialChat, make sure it's in sync with the loaded chats
+                    if (initialChat) {
+                        const updatedInitialChat = loadedChats.find(
+                            chat => chat.id === initialChat.id
+                        );
+                        if (updatedInitialChat) {
+                            setCurrentChat(updatedInitialChat);
+                        }
+                    }
                 }
             } catch (error) {
                 console.error('Error loading chats:', error);
@@ -99,7 +116,7 @@ const ChatArea = () => {
             }
         };
         loadChats();
-    }, []);
+    }, [initialChat]);
 
     // --- Message Submission Handler ---
     const handleSubmit = useCallback(
@@ -315,42 +332,48 @@ const ChatArea = () => {
         setTempChat(tempNewChat);
         setCurrentChat(tempNewChat);
         setSidebarOpen(false);
-
-        // Update URL immediately when creating a new chat
-        router.replace('/ai-chat', { scroll: false });
+        router.replace('/ai-chat');
     }, [router]);
 
-    const loadChat = useCallback(
-        (chat) => {
-            if (chat.id === currentChat?.id) return;
-            setCurrentChat(chat);
+    const loadChat = useCallback(async (chat) => {
+        if (chat.id === currentChat?.id) return;
+
+        try {
+            // Fetch the full chat data from the backend
+            const response = await axiosInstance.get(`/chats/${chat.id}`);
+            const fullChat = response.data.chat;
+
+            setCurrentChat(fullChat);
             setSidebarOpen(false);
-
-            if (typeof window !== 'undefined') {
-                window.history.pushState({}, '', `/chat/${chat.id}`);
-            }
-
+            router.push(`/chat/${chat.id}`, { scroll: false });
             setTimeout(scrollToBottom, 100);
-        },
-        [currentChat, scrollToBottom]
-    );
+        } catch (error) {
+            console.error('Error loading chat:', error);
+            showToast({ type: 'error', message: 'Failed to load chat' });
+        }
+    }, [currentChat, router, scrollToBottom]);
 
     useEffect(() => {
-        const handlePopState = () => {
+        const handlePopState = async () => {
             const pathSegments = window.location.pathname.split('/');
             const chatId = pathSegments[pathSegments.length - 1];
 
-            if (chatId && chats.length > 0) {
-                const chat = chats.find((c) => c.id === chatId);
-                if (chat) {
-                    setCurrentChat(chat);
+            if (chatId && chatId !== 'chat') {
+                try {
+                    const response = await axiosInstance.get(`/chats/${chatId}`);
+                    setCurrentChat(response.data.chat);
+                } catch (error) {
+                    console.error('Error loading chat:', error);
+                    showToast({ type: 'error', message: 'Failed to load chat' });
                 }
+            } else {
+                setCurrentChat(null);
             }
         };
 
         window.addEventListener('popstate', handlePopState);
         return () => window.removeEventListener('popstate', handlePopState);
-    }, [chats]);
+    }, []);
 
     useEffect(() => {
         const chatId = params?.chatId;
@@ -374,7 +397,7 @@ const ChatArea = () => {
             if (currentChat?.id === chatId) {
                 setCurrentChat(null);
             }
-            router.replace('/ai-chat', { scroll: false });
+            router.push('/chat');
             showToast({ type: 'success', message: response.data.message });
         } catch (error) {
             console.error('Error deleting chat:', error);
@@ -506,15 +529,10 @@ const ChatArea = () => {
 
     // --- Render ---
     return (
-        <div
-            className={`h-screen w-full bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-gray-900 dark:to-indigo-950 transition-all duration-300 ${isExpanded ? 'p-0' : 'p-4'
-                }`}
-        >
-            <div
-                className={`h-full bg-white dark:bg-gray-900 rounded-2xl shadow-xl overflow-hidden flex transition-all duration-300 ${isExpanded ? 'scale-100' : 'scale-98 hover:scale-99'
-                    }`}
-            >
-                {/* Sidebar */}
+        <div className={`h-screen w-full bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-gray-900 dark:to-indigo-950 transition-all duration-300 ${isExpanded ? 'p-0' : 'p-4'
+            }`}>
+            <div className={`h-full bg-white dark:bg-gray-900 rounded-2xl shadow-xl overflow-hidden flex transition-all duration-300 ${isExpanded ? 'scale-100' : 'scale-98 hover:scale-99'
+                }`}>
                 <ChatSidebar
                     chats={chats}
                     currentChat={currentChat}
@@ -526,9 +544,7 @@ const ChatArea = () => {
                     tempChat={tempChat}
                 />
 
-                {/* Main Chat Area */}
                 <div className="flex-1 flex flex-col h-full relative">
-                    {/* Top Bar */}
                     <ChatTopBar
                         currentChat={currentChat}
                         isExpanded={isExpanded}
@@ -537,7 +553,6 @@ const ChatArea = () => {
                         onSetSidebarOpen={setSidebarOpen}
                     />
 
-                    {/* Messages Area */}
                     <ChatMessageList
                         messages={currentChat?.messages || []}
                         streamingMessage={streamingMessage}
@@ -556,11 +571,11 @@ const ChatArea = () => {
                             const updatedChats = chats.map((chat) =>
                                 chat.id === currentChat.id ? updatedChat : chat
                             );
+                            setChats(updatedChats);
                         }}
                         processingMessageId={processingMessageId}
                     />
 
-                    {/* Input Area */}
                     <ChatInputArea
                         prompt={prompt}
                         selectedImage={selectedImage}

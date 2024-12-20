@@ -320,7 +320,6 @@ const ChatArea = ({ initialChat }) => {
         }
     }, [prompt, handleSubmit]);
 
-
     // --- Chat Management Functions ---
     const createNewChat = useCallback(() => {
         const tempNewChat = {
@@ -398,14 +397,13 @@ const ChatArea = ({ initialChat }) => {
             if (currentChat?.id === chatId) {
                 setCurrentChat(null);
             }
-            router.push('/chat');
+            router.push('/ai-chat');
             showToast({ type: 'success', message: response.data.message });
         } catch (error) {
             console.error('Error deleting chat:', error);
             showToast({ type: 'error', message: 'Failed to delete chat' });
         }
     };
-
 
     // --- Message Edit Handler ---
     const handleMessageEdit = useCallback(

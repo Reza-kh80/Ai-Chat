@@ -7,6 +7,17 @@ export const themes = {
     dark: 'dark'
 };
 
+export const languages = {
+    en: 'en',
+    fa: 'fa'
+};
+
+// Add direction mapping
+const languageDirections = {
+    en: 'ltr',
+    fa: 'rtl'
+};
+
 export function ThemeProvider({ children }) {
     const [theme, setTheme] = useState(() => {
         if (typeof window !== 'undefined') {
@@ -15,15 +26,37 @@ export function ThemeProvider({ children }) {
         return themes.light;
     });
 
+    const [language, setLanguage] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem('lang') || languages.en;
+        }
+        return languages.en;
+    });
+
     useEffect(() => {
         const root = window.document.documentElement;
+        // Handle theme
         root.classList.remove(...Object.values(themes));
         root.classList.add(theme);
         localStorage.setItem('theme', theme);
     }, [theme]);
 
+    useEffect(() => {
+        const root = window.document.documentElement;
+        // Handle language and direction
+        root.setAttribute('lang', language);
+        root.setAttribute('dir', languageDirections[language]);
+        localStorage.setItem('lang', language);
+    }, [language]);
+
     return (
-        <ThemeContext.Provider value={{ theme, setTheme }}>
+        <ThemeContext.Provider value={{
+            theme,
+            setTheme,
+            language,
+            setLanguage,
+            direction: languageDirections[language]
+        }}>
             {children}
         </ThemeContext.Provider>
     );

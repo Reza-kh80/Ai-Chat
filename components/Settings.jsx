@@ -1,14 +1,14 @@
 import React from 'react';
-import { Moon, Sun, LogOut } from 'lucide-react';
+import { Moon, Sun, LogOut, Globe } from 'lucide-react';
 import { Button } from '@/ui_template/ui/button';
-import { useTheme, themes } from '@/contexts/ThemeContext ';
+import { useTheme, themes, languages } from '@/contexts/ThemeContext ';
 import { useRouter } from 'next/router';
 import { showToast } from '@/ui_template/ui/toast';
 import axiosInstance from '@/lib/axiosInstance';
 import nookies from 'nookies';
 
 const Settings = ({ email, active }) => {
-    const { theme, setTheme } = useTheme();
+    const { theme, setTheme, language, setLanguage } = useTheme();
     const { push } = useRouter();
 
     const themeIcons = {
@@ -16,11 +16,23 @@ const Settings = ({ email, active }) => {
         [themes.dark]: <Moon className="h-5 w-5 transition-transform duration-300 group-hover:-rotate-12" />,
     };
 
+    const languageLabels = {
+        [languages.en]: 'English',
+        [languages.fa]: 'فارسی',
+    };
+
     const nextTheme = () => {
         const themeValues = Object.values(themes);
         const currentIndex = themeValues.indexOf(theme);
         const nextIndex = (currentIndex + 1) % themeValues.length;
         setTheme(themeValues[nextIndex]);
+    };
+
+    const handleLanguageChange = () => {
+        const languageValues = Object.values(languages);
+        const currentIndex = languageValues.indexOf(language);
+        const nextIndex = (currentIndex + 1) % languageValues.length;
+        setLanguage(languageValues[nextIndex]);
     };
 
     const handleLogOut = () => {
@@ -65,6 +77,34 @@ const Settings = ({ email, active }) => {
                         </div>
                         <span className="font-medium">
                             {theme.charAt(0).toUpperCase() + theme.slice(1)} Mode
+                        </span>
+                    </div>
+                    <div className="text-xs px-2.5 py-1 rounded-full 
+                    bg-primary-100 dark:bg-primary-800 ocean:bg-accent-800
+                    group-hover:bg-primary-200 dark:group-hover:bg-primary-700 ocean:group-hover:bg-accent-700">
+                        Toggle
+                    </div>
+                </Button>
+
+                <Button
+                    disabled
+                    variant="ghost"
+                    onClick={handleLanguageChange}
+                    className="group w-full flex items-center justify-between px-4
+                    rounded-xl transition-all duration-300 ease-in-out
+                    bg-primary-50/50 dark:bg-primary-900/50 ocean:bg-accent-900/50
+                    hover:bg-primary-100 dark:hover:bg-primary-800/80 ocean:hover:bg-accent-800/80
+                    text-primary-900 dark:text-primary-50 ocean:text-accent-50
+                    shadow-sm hover:shadow-md py-9"
+                >
+                    <div className="flex items-center space-x-3">
+                        <div className="p-2 rounded-lg 
+                        bg-primary-100 dark:bg-primary-800 ocean:bg-accent-800
+                        group-hover:bg-primary-200 dark:group-hover:bg-primary-700 ocean:group-hover:bg-accent-700">
+                            <Globe className="h-5 w-5 transition-transform duration-300 group-hover:rotate-180" />
+                        </div>
+                        <span className="font-medium">
+                            {languageLabels[language]}
                         </span>
                     </div>
                     <div className="text-xs px-2.5 py-1 rounded-full 

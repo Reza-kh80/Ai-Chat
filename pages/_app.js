@@ -9,10 +9,28 @@ import MessageLoader from "@/components/MessageLoader";
 
 function MyApp({ Component, pageProps, isAuthenticated }) {
   const [isLoading, setIsLoading] = useState(true);
+  const [isRouteChanging, setIsRouteChanging] = useState(false);
   const router = useRouter();
 
   const APP_NAME = "FitTech AI";
   const APP_DESCRIPTION = "A smart fitness assistant combining AI with personalized workout and health recommendations.";
+
+  useEffect(() => {
+    // Handle route change events
+    const handleStart = () => setIsRouteChanging(true);
+    const handleComplete = () => setIsRouteChanging(false);
+    const handleError = () => setIsRouteChanging(false);
+
+    router.events.on('routeChangeStart', handleStart);
+    router.events.on('routeChangeComplete', handleComplete);
+    router.events.on('routeChangeError', handleError);
+
+    return () => {
+      router.events.off('routeChangeStart', handleStart);
+      router.events.off('routeChangeComplete', handleComplete);
+      router.events.off('routeChangeError', handleError);
+    };
+  }, [router]);
 
   useEffect(() => {
     const handleClientSideRouting = async () => {
@@ -47,13 +65,15 @@ function MyApp({ Component, pageProps, isAuthenticated }) {
     };
   }, [router, isAuthenticated]);
 
-  if (isLoading) {
-    return (
-      <div className="loading-screen flex items-center justify-center h-screen bg-gray-100">
+  // Loading component
+  const LoadingScreen = () => (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-white bg-opacity-90 backdrop-blur-sm">
+      <div className="text-center">
         <MessageLoader />
+        <p className="mt-4 text-sm text-gray-600">Loading...</p>
       </div>
-    );
-  }
+    </div>
+  );
 
   return (
     <ThemeProvider>
@@ -72,10 +92,19 @@ function MyApp({ Component, pageProps, isAuthenticated }) {
         <link rel="manifest" href="/manifest.json" />
         <link rel="apple-touch-icon" href="/Logo.png" />
       </Head>
+
+      {/* Show loading screen during initial load */}
+      {isLoading && <LoadingScreen />}
+
+      {/* Show loading screen during route changes */}
+      {isRouteChanging && <LoadingScreen />}
+
+      {/* Main content */}
       <Component {...pageProps} />
     </ThemeProvider>
   );
 }
+
 
 MyApp.getInitialProps = async (appContext) => {
   const { ctx } = appContext;

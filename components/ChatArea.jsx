@@ -56,7 +56,7 @@ const ChatArea = ({ initialChat }) => {
     const [selectedImage, setSelectedImage] = useState(null);
     const [isSidebarOpen, setSidebarOpen] = useState(false);
     const [currentChat, setCurrentChat] = useState(null);
-    const [isExpanded, setIsExpanded] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
     const [tempChat, setTempChat] = useState(null);
     const [prompt, setPrompt] = useState('');

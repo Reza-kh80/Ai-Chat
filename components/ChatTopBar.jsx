@@ -10,27 +10,40 @@ import {
     Mail,
     Twitter,
     Send,
-    X
+    X,
+    Sun,
+    Moon
 } from 'lucide-react';
 import { Button } from '@/ui_template/ui/button';
 import Link from 'next/link';
+import { useTheme, themes } from '@/contexts/ThemeContext ';
 
-const ChatTopBar = ({ currentChat, isExpanded, onDeleteChat, onSetIsExpanded, onSetSidebarOpen }) => {
+const ChatTopBar = ({ currentChat, isExpanded, onDeleteChat, onSetIsExpanded, onSetSidebarOpen, isSharedView = false }) => {
     const [showShareModal, setShowShareModal] = useState(false);
     const [copySuccess, setCopySuccess] = useState(false);
+    const { theme, setTheme } = useTheme();
+
+    const toggleTheme = () => {
+        const themeValues = Object.values(themes);
+        const currentIndex = themeValues.indexOf(theme);
+        const nextIndex = (currentIndex + 1) % themeValues.length;
+        setTheme(themeValues[nextIndex]);
+    };
 
     const copyToClipboard = async () => {
-        const currentUrl = window.location.href;
+        // Update the URL construction to use the new shared path
+        const baseUrl = window.location.origin;
+        const chatUrl = isSharedView
+            ? window.location.href
+            : `${baseUrl}/shared/${currentChat.id}`;
 
         try {
-            // Try using the Clipboard API
             if (navigator.clipboard && window.isSecureContext) {
-                await navigator.clipboard.writeText(currentUrl);
+                await navigator.clipboard.writeText(chatUrl);
                 setCopySuccess(true);
             } else {
-                // Fallback for older browsers
                 const textArea = document.createElement('textarea');
-                textArea.value = currentUrl;
+                textArea.value = chatUrl;
                 textArea.style.position = 'fixed';
                 textArea.style.left = '-999999px';
                 textArea.style.top = '-999999px';
@@ -51,7 +64,6 @@ const ChatTopBar = ({ currentChat, isExpanded, onDeleteChat, onSetIsExpanded, on
             console.error('Failed to copy URL: ', err);
         }
 
-        // Reset success message after 2 seconds
         setTimeout(() => {
             setCopySuccess(false);
             setShowShareModal(false);
@@ -59,8 +71,11 @@ const ChatTopBar = ({ currentChat, isExpanded, onDeleteChat, onSetIsExpanded, on
     };
 
     const shareToPlatform = (platform) => {
-        const currentUrl = window.location.href;
-        const encodedUrl = encodeURIComponent(currentUrl);
+        const baseUrl = window.location.origin;
+        const chatUrl = isSharedView
+            ? window.location.href
+            : `${baseUrl}/shared/${currentChat.id}`;
+        const encodedUrl = encodeURIComponent(chatUrl);
 
         const shareUrls = {
             telegram: `https://t.me/share/url?url=${encodedUrl}`,
@@ -75,15 +90,17 @@ const ChatTopBar = ({ currentChat, isExpanded, onDeleteChat, onSetIsExpanded, on
     return (
         <>
             <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
-                <Button
-                    onClick={() => onSetSidebarOpen(true)}
-                    className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
-                >
-                    <Menu className="h-5 w-5" />
-                </Button>
+                {!isSharedView && (
+                    <Button
+                        onClick={() => onSetSidebarOpen(true)}
+                        className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+                    >
+                        <Menu className="h-5 w-5" />
+                    </Button>
+                )}
 
                 <div className="flex items-center gap-4">
-                    {currentChat && (
+                    {currentChat && !isSharedView && onDeleteChat && (
                         <Button
                             onClick={() => onDeleteChat(currentChat.id)}
                             className="flex items-center gap-2 p-3 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 transition-all duration-200"
@@ -97,22 +114,44 @@ const ChatTopBar = ({ currentChat, isExpanded, onDeleteChat, onSetIsExpanded, on
                     >
                         <Share2 className="h-5 w-5" />
                     </Button>
-                    <Button
-                        onClick={() => onSetIsExpanded(!isExpanded)}
-                        className="p-3 hover:bg-gray-50 dark:hover:bg-gray-800/50"
-                    >
-                        {isExpanded ? (
-                            <Minimize2 className="h-5 w-5" />
-                        ) : (
-                            <Maximize2 className="h-5 w-5" />
-                        )}
-                    </Button>
-                    <Link
-                        href="/settings"
-                        className="p-3 hover:bg-gray-50 dark:hover:bg-gray-800/50"
-                    >
-                        <Settings className="h-5 w-5" />
-                    </Link>
+                    {
+                        isSharedView && (
+                            <div className="ml-auto flex items-center gap-2">
+                                <Button
+                                    onClick={toggleTheme}
+                                    variant="ghost"
+                                    size="sm"
+                                    className="flex items-center gap-2"
+                                >
+                                    {theme === 'light' ? (
+                                        <Sun className="h-5 w-5" />
+                                    ) : (
+                                        <Moon className="h-5 w-5" />
+                                    )}
+                                </Button>
+                            </div>
+                        )
+                    }
+                    {!isSharedView && (
+                        <>
+                            <Button
+                                onClick={() => onSetIsExpanded(!isExpanded)}
+                                className="p-3 hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                            >
+                                {isExpanded ? (
+                                    <Minimize2 className="h-5 w-5" />
+                                ) : (
+                                    <Maximize2 className="h-5 w-5" />
+                                )}
+                            </Button>
+                            <Link
+                                href="/settings"
+                                className="p-3 hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                            >
+                                <Settings className="h-5 w-5" />
+                            </Link>
+                        </>
+                    )}
                 </div>
             </div>
 

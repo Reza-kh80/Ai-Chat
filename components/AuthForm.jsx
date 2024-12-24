@@ -76,9 +76,14 @@ const AuthForm = () => {
                 secure: process.env.NODE_ENV === 'production',
                 sameSite: 'strict'
             });
-            
+
             showToast({ message: response?.data?.message, type: "success" });
-            push('/ai-chat');
+            if (localStorage.getItem('sharedId')) {
+                push(`/shared/${localStorage.getItem('sharedId')}`);
+                localStorage.removeItem('sharedId');
+            } else {
+                push('/ai-chat');
+            }
         } catch (error) {
             showToast({ message: error.response?.data?.message || "Login failed", type: "error" });
         }

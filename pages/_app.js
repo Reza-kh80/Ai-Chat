@@ -39,6 +39,10 @@ function MyApp({ Component, pageProps, isAuthenticated }) {
 
         if (!isAuthenticated) {
           if (!publicRoutes.includes(router.pathname)) {
+            // Store the shared ID if the path matches /shared/[id]
+            if (typeof window !== 'undefined' && router.pathname === '/shared/[id]' && router.query.id) {
+              localStorage.setItem('sharedId', router.query.id);
+            }
             router.push('/authentication');
           }
         } else if (publicRoutes.includes(router.pathname)) {
@@ -46,6 +50,10 @@ function MyApp({ Component, pageProps, isAuthenticated }) {
         }
       } catch (error) {
         console.error('Auth check error:', error);
+        // Store the shared ID in case of error as well
+        if (typeof window !== 'undefined' && router.pathname === '/shared/[id]' && router.query.id) {
+          localStorage.setItem('sharedId', router.query.id);
+        }
         router.push('/authentication');
       } finally {
         setIsLoading(false);
@@ -65,7 +73,7 @@ function MyApp({ Component, pageProps, isAuthenticated }) {
     };
   }, [router, isAuthenticated]);
 
-  // Loading component
+  // Rest of the code remains the same...
   const LoadingScreen = () => (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-white bg-opacity-90 backdrop-blur-sm">
       <div className="text-center">
@@ -104,7 +112,6 @@ function MyApp({ Component, pageProps, isAuthenticated }) {
     </ThemeProvider>
   );
 }
-
 
 MyApp.getInitialProps = async (appContext) => {
   const { ctx } = appContext;
